@@ -156,7 +156,8 @@ impl<'a, T> IntoIterator for StackVec<'a, T> {
         // let slice = &self.storage[..self.len];
         // // let slice = self.as_slice();
         // slice.iter()
-        self.into_slice().iter()
+        // self.into_slice().iter()
+        self.storage[..self.len].iter()
     }
 }
 
