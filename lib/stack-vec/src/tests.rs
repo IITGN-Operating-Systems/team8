@@ -182,6 +182,9 @@ fn iterator() {
         assert_eq!(*val, i * i);
         i += 1;
     }
+
+    // check for stack_vec's resources if still available or not
+    // since impl<'a, T> IntoIterator for StackVec<'a, T> should consume the stack_vec
 }
 
 #[test]
