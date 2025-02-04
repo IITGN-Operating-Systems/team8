@@ -26,7 +26,10 @@ impl<'a, T: 'a> StackVec<'a, T> {
     /// store. The returned `StackVec` will be able to hold `storage.len()`
     /// values.
     pub fn new(storage: &'a mut [T]) -> StackVec<'a, T> {
-        StackVec { storage: storage, len: 0 }
+        StackVec { 
+            storage, 
+            len: 0 
+        }
 
     }
 
@@ -42,7 +45,10 @@ impl<'a, T: 'a> StackVec<'a, T> {
         if len > storage.len(){
             panic!("len should be less than or equal to {}", storage.len());
         }
-        StackVec { storage: storage, len: len }
+        StackVec { 
+            storage, 
+            len 
+        }
     }
 
     /// Returns the number of elements this vector can hold.
@@ -131,13 +137,13 @@ impl<'a, T: Clone + 'a> StackVec<'a, T> {
 impl<'a, T> Deref for StackVec<'a, T> {
     type Target = [T];
 
-    fn deref(&self) -> &[T] {
+    fn deref(&self) -> &Self::Target {
         self.as_slice()
     }
 }
 
 impl<'a, T> DerefMut for StackVec<'a, T> {
-    fn deref_mut(&mut self) -> &mut [T] {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_mut_slice()
     }
 }
