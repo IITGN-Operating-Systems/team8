@@ -34,13 +34,21 @@ Vec owns its elements, so it can move them out of the vector without cloning.
 - **Tests Using DerefMut**: Any test that modifies StackVec as a slice (e.g., sorting or mutating elements).
 All those tests will be failing if Deref and DrefMut are not implemented.
 
-## SubPhase B: `volatile`
+## SubPhase B: `Volatile`
 
-**Question**: How are read-only and write-only accesses enforced? (enforcing)
+**Question**: Why does `Unique<Volatile>` exists? What is difference between `Volatile` and `Unique<Volatile>`?
 
-**Question**: What do the macros do? (macros)
+`Unique<Volatile>` is a wrapper around a raw pointer that ensures the pointer is unique (i.e., no other references point to the same memory). This is necessary because `Volatile` requires exclusive access to the memory it points to. If multiple references to the same memory existed, they could concurrently read or write to the memory, violating the guarantees provided by `Volatile`.
 
-## SubPhase D: `ttywrite`
+**Question**: How are read-only and write-only accesses enforced? The `ReadVolatile` and `WriteVolatile` types make it impossible to write and read, respectively, the underlying pointer. How do they accomplish this?
+
+`ReadVolatile` and `WriteVolatile` enforce read-only and write-only accesses by wrapping a `Unique<Volatile>` pointer and providing methods that only allow reading or writing, respectively. For example, `ReadVolatile` provides a `read` method that reads the value at the pointer, while `WriteVolatile` provides a `write` method that writes a value to the pointer. These methods ensure that the underlying pointer is only used for the intended access type (read or write).
+
+**Question**: What do the macros do? What do the `readable!`, `writeable!`, and `readable_writeable!` macros do?
+
+The `readable!`, `writeable!`, and `readable_writeable!` macros generate implementations of the `Readable` and `Writeable` traits for the specified types. These traits provide methods for reading (`read_volatile `) and writing (`write_volatile`) values from/to memory, respectively. The macros generate implementations for the specified types, allowing them to be used with `ReadVolatile` and `WriteVolatile` to read and write values from/to memory.
+
+## SubPhase D: `TTYWrite`
 
 **Question**: What happens when a flag’s input is invalid?
 
