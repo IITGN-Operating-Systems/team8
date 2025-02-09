@@ -5,6 +5,26 @@
 - Hitesh Kumar (22110098)
 - Md Sibtain Raza (22110148)
 
+# SubPhase A: Stack-Vec
+**Question**: Why does push return a Result?
+**Answer**: StackVec::push can fail because the backing storage has a fixed capacity. If the StackVec is full, push returns an Err to indicate that the operation failed.
+Vec dynamically allocates memory, so it can grow as needed. StackVec cannot grow beyond its fixed capacity, so push must handle the case where the vector is full.
+
+
+**Question**: Why is the 'a bound on T required?
+Answer: The 'a bound ensures that any references inside T (if T contains references) are valid for the lifetime 'a of the backing storage. Without this bound, StackVec could store references that outlive the backing storage, leading to dangling references (accessing invalid memory).
+Vec owns its elements, so it can move them out of the vector without cloning.
+
+
+- Why does StackVec require T: Clone to pop()?
+Answer: StackVec::pop removes the last element from the vector and returns it. Since StackVec borrows its storage (it doesn’t own the elements), it cannot move elements out of the slice directly. Instead, it clones the element before removing it.
+
+
+- Which Tests Use Deref and DerefMut?
+Tests Using Deref: Any test that treats StackVec as a slice (e.g., indexing, slicing, or calling slice methods like len() or iter()).
+Tests Using DerefMut: Any test that modifies StackVec as a slice (e.g., sorting or mutating elements).
+All those tests will be failing if Deref and DrefMut are not implemented.
+
 # SubPhase D: ttywrite
 
 **Question**: What happens when a flag’s input is invalid?
