@@ -5,6 +5,16 @@
 - Hitesh Kumar (22110098)
 - Md Sibtain Raza (22110148)
 
+# SubPhase D: ttywrite
+
+**Question**: What happens when a flag’s input is invalid?
+
+StructOpt rejects invalid flag values because custom parsing functions (e.g., parse_flow_control) return a Result. For example, if -f idk is provided, parse_flow_control returns an Err, prompting StructOpt to display an error and exit. These parsers validate inputs by returning Ok only for valid values, ensuring invalid inputs are rejected early in argument parsing.
+
+**Question**: Why does the test.sh script always set -r? (bad-tests)
+
+The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup likely lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
+
 # CS330 Lab assignments
 
 This repository contains lab assignments for CS330 "Operating Systems".
