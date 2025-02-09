@@ -36,6 +36,9 @@ All those tests will be failing if Deref and DrefMut are not implemented.
 
 ## SubPhase B: `volatile`
 
+**Question**: How are read-only and write-only accesses enforced? (enforcing)
+
+**Question**: What do the macros do? (macros)
 
 ## SubPhase D: `ttywrite`
 
