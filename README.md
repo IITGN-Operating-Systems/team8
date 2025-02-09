@@ -1,5 +1,9 @@
 # Team-8 Let's Get Rusty!
 
+<div align = "center">
+    <img src = "./Rusty.JPG" style="width: 50%">
+</div>
+
 - Bhavik Patel (22110047)
 - Guntas Singh Saran (22110089)
 - Hitesh Kumar (22110098)
