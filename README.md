@@ -1,3 +1,10 @@
+# Team-8 Let's Get Rusty!
+
+- Bhavik Patel (22110047)
+- Guntas Singh Saran (22110089)
+- Hitesh Kumar (22110098)
+- Md Sibtain Raza (22110148)
+
 # CS330 Lab assignments
 
 This repository contains lab assignments for CS330 "Operating Systems".
@@ -20,7 +27,7 @@ To use these dependencies, we have to use older nightly versions of Rust.
 
 ## Can we use latest Rust nightly?
 
-You are free to port the code over to newer versions, and will recieve significant 
+You are free to port the code over to newer versions, and will recieve significant
 bonus points for it. We will try to help you if you get stuck.  
 But sadly, this endeavour will not be considered for deadline extension. ¯\\\_(ツ)\_/¯
 
@@ -28,5 +35,5 @@ But sadly, this endeavour will not be considered for deadline extension. ¯\\\_(
 
 We built our labs based on the materials developed for
 `Georgia Tech CS3210` and `CS140e: An Experimental Course on Operating Systems` by Sergio Benitez.  
-We want to port it to use newer toolchains such as Rust 2021 (or hopefully 2024) edition and 
+We want to port it to use newer toolchains such as Rust 2021 (or hopefully 2024) edition and
 Raspberry 5 if possible.
