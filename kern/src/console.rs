@@ -18,7 +18,9 @@ impl Console {
     /// Initializes the console if it's not already initialized.
     #[inline]
     fn initialize(&mut self) {
-        self.inner = Some(MiniUart::new());
+        if self.inner.is_none() {
+            self.inner = Some(MiniUart::new());
+        }
     }
 
     /// Returns a mutable borrow to the inner `MiniUart`, initializing it as
