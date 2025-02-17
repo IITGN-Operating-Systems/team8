@@ -59,6 +59,11 @@ The `readable!`, `writeable!`, and `readable_writeable!` macros generate impleme
 The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
 
 # Lab 4
+## SubPhase A: `Getting Started`
+
+## SubPhase B: `System Timer`
+
+**Question**:  Why can’t you write to CLO or CHI? (restricted-reads) The BCM2837 documentation states that the CLO and CHI registers are read-only. Our code enforces this property. How? What prevents us from writing to CLO or CHI?
 
 
 # CS330 Lab assignments
