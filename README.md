@@ -28,7 +28,7 @@ Vec owns its elements, so it can move them out of the vector without cloning.
 
 **Question**: Which Tests Use `Deref` and `DerefMut`?
 
-**Answers**:
+**Answer**:
 
 - **Tests Using Deref**: Any test that treats StackVec as a slice (e.g., indexing, slicing, or calling slice methods like len() or iter()).
 - **Tests Using DerefMut**: Any test that modifies StackVec as a slice (e.g., sorting or mutating elements).
@@ -38,25 +38,25 @@ Vec owns its elements, so it can move them out of the vector without cloning.
 
 **Question**: Why does `Unique<Volatile>` exists? What is difference between `Volatile` and `Unique<Volatile>`?
 
-`Unique<Volatile>` is a wrapper around a raw pointer that ensures the pointer is unique (i.e., no other references point to the same memory). This is necessary because `Volatile` requires exclusive access to the memory it points to. If multiple references to the same memory existed, they could concurrently read or write to the memory, violating the guarantees provided by `Volatile`.
+**Answer**: `Unique<Volatile>` is a wrapper around a raw pointer that ensures the pointer is unique (i.e., no other references point to the same memory). This is necessary because `Volatile` requires exclusive access to the memory it points to. If multiple references to the same memory existed, they could concurrently read or write to the memory, violating the guarantees provided by `Volatile`.
 
 **Question**: How are read-only and write-only accesses enforced? The `ReadVolatile` and `WriteVolatile` types make it impossible to write and read, respectively, the underlying pointer. How do they accomplish this?
 
-`ReadVolatile` and `WriteVolatile` enforce read-only and write-only accesses by wrapping a `Unique<Volatile>` pointer and providing methods that only allow reading or writing, respectively. For example, `ReadVolatile` provides a `read` method that reads the value at the pointer, while `WriteVolatile` provides a `write` method that writes a value to the pointer. These methods ensure that the underlying pointer is only used for the intended access type (read or write).
+**Answer**: `ReadVolatile` and `WriteVolatile` enforce read-only and write-only accesses by wrapping a `Unique<Volatile>` pointer and providing methods that only allow reading or writing, respectively. For example, `ReadVolatile` provides a `read` method that reads the value at the pointer, while `WriteVolatile` provides a `write` method that writes a value to the pointer. These methods ensure that the underlying pointer is only used for the intended access type (read or write).
 
 **Question**: What do the macros do? What do the `readable!`, `writeable!`, and `readable_writeable!` macros do?
 
-The `readable!`, `writeable!`, and `readable_writeable!` macros generate implementations of the `Readable` and `Writeable` traits for the specified types. These traits provide methods for reading (`read_volatile `) and writing (`write_volatile`) values from/to memory, respectively. The macros generate implementations for the specified types, allowing them to be used with `ReadVolatile` and `WriteVolatile` to read and write values from/to memory.
+**Answer**: The `readable!`, `writeable!`, and `readable_writeable!` macros generate implementations of the `Readable` and `Writeable` traits for the specified types. These traits provide methods for reading (`read_volatile `) and writing (`write_volatile`) values from/to memory, respectively. The macros generate implementations for the specified types, allowing them to be used with `ReadVolatile` and `WriteVolatile` to read and write values from/to memory.
 
 ## SubPhase D: `TTYWrite`
 
 **Question**: What happens when a flag’s input is invalid?
 
-`StructOpt` rejects invalid flag values because custom parsing functions (e.g., parse_flow_control) return a Result. For example, if -f idk is provided, parse_flow_control returns an Err, prompting `StructOpt` to display an error and exit. These parsers validate inputs by returning `Ok` only for valid values, ensuring invalid inputs are rejected early in argument parsing.
+**Answer**: `StructOpt` rejects invalid flag values because custom parsing functions (e.g., parse_flow_control) return a Result. For example, if -f idk is provided, parse_flow_control returns an Err, prompting `StructOpt` to display an error and exit. These parsers validate inputs by returning `Ok` only for valid values, ensuring invalid inputs are rejected early in argument parsing.
 
 **Question**: Why does the `test.sh` script always set -r? (bad-tests)
 
-The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
+**Answer**: The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
 
 # Lab 4
 ## SubPhase A: `Getting Started`
@@ -65,6 +65,7 @@ The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive rec
 
 **Question**:  Why can’t you write to CLO or CHI? (restricted-reads) The BCM2837 documentation states that the CLO and CHI registers are read-only. Our code enforces this property. How? What prevents us from writing to CLO or CHI?
 
+**Answer**: The code enforces that `CLO` and `CHI` are read-only by declaring them as `ReadVolatile<u32>`. This type only provides a method for reading the value, which prevents any write operations. If they were declared as `Volatile<u32>`, the API would allow writes, which could lead to accidental modifications of registers that are specified as read-only by the BCM2837 documentation, potentially causing undefined behavior or hardware errors.
 
 # CS330 Lab assignments
 
