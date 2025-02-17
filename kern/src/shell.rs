@@ -43,15 +43,15 @@ impl<'a> Command<'a> {
 
 /// Starts a shell using `prefix` as the prefix for each line. This function
 /// returns if the `exit` command is called.
-pub fn shell(prefix: &str) -> ! {
-    let mut line = StackVec::new(&mut [0u8; 512]);
+pub fn shell(prefix: &str) {
+    let mut line = [0u8; 512];
     let mut buf = StackVec::new(&mut line);
     let mut pwd = PathBuf::from("/");
-    let exit = "exit";
+    let mut exit = false;
     while !exit{
         kprint!("{} {}", pwd.to_str().unwrap(), prefix);
         read_command(&mut buf);
-        cmd = Command::parse(str::from_utf8(buf.as_slice()).unwrap(), &mut [""; 64]).unwrap();
+        exit = execute_command(&mut buf, &mut pwd);
     }
 
 }
@@ -88,17 +88,29 @@ fn store_command(buf: &mut StackVec<u8>, input: u8) {
     }
 }
 
-fn execute_command(cmd: Command, pwd: &mut PathBuf) {
-    match cmd.path() {
-        "ls" => s_ls(pwd),
-        "pwd" => s_pwd(pwd),
-        "echo" => s_echo(&cmd.args[1..]),
-        "cd" => s_cd(pwd, &cmd.args[1..]),
-        "cat" => s_cat(pwd, &cmd.args[1..]),
-        "sleep" => s_sleep(cmd.args[1]),
-        "time" => s_time(),
-        _ => kprint!("command not found: {}\r\n", cmd.path()),
+fn execute_command(buf: &mut StackVec<u8>, pwd: &mut PathBuf) -> bool {
+    let cmd = Command::parse(str::from_utf8(buf.as_slice()).unwrap(), &mut [""; 64]);
+
+    match cmd {
+        Ok(cmd) => {
+            match cmd.path() {
+                "exit" => return true,
+                "ls" => s_ls(pwd),
+                "pwd" => s_pwd(pwd),
+                "echo" => s_echo(&cmd.args[1..]),
+                "cd" => s_cd(pwd, &cmd.args[1..]),
+                "cat" => s_cat(pwd, &cmd.args[1..]),
+                "sleep" => s_sleep(cmd.args[1]),
+                "time" => s_time(),
+                _ => kprint!("command not found\r\n")
+            }
+        },
+        Err(Error::TooManyArgs) => kprint!("too many arguments\r\n"),
+        _ => {}
+
     }
+    buf.truncate(0);
+    false
 }
 
 // -----------------------------------Implementing shell commands-----------------------------------
