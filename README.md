@@ -9,6 +9,7 @@
 - Hitesh Kumar (22110098)
 - Md Sibtain Raza (22110148)
 
+# Lab 3
 ## SubPhase A: `Stack-Vec`
 
 **Question**: Why does push return a Result?
@@ -56,6 +57,9 @@ The `readable!`, `writeable!`, and `readable_writeable!` macros generate impleme
 **Question**: Why does the `test.sh` script always set -r? (bad-tests)
 
 The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
+
+# Lab 4
+
 
 # CS330 Lab assignments
 
