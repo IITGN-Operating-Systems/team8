@@ -17,7 +17,15 @@ use console::kprintln;
 // FIXME: You need to add dependencies here to
 // test your drivers (Phase 2). Add them as needed.
 
+use pi::uart::MiniUart;
+
 fn kmain() -> ! {
     // FIXME: Start the shell.
-    unimplemented!()
+
+    let mut uart = MiniUart::new();
+
+    loop {
+        let byte = uart.read_byte(); // Read one byte from UART
+        uart.write_byte(byte); // Echo the byte back
+    }
 }
