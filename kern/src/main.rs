@@ -19,7 +19,7 @@ use console::kprintln;
 
 use pi::uart::MiniUart;
 
-fn kmain() -> ! {
+fn kmain() {
     // FIXME: Start the shell.
 
     let mut uart = MiniUart::new();
