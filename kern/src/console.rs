@@ -17,7 +17,9 @@ impl Console {
     /// Initializes the console if it's not already initialized.
     #[inline]
     fn initialize(&mut self) {
-        self.inner = Some(MiniUart::new())
+        kprintln!("Initializing UART...");
+        self.inner = Some(MiniUart::new());
+        kprintln!("UART initialized.");
     }
 
     /// Returns a mutable borrow to the inner MiniUart, initializing it as
@@ -68,7 +70,7 @@ pub static CONSOLE: Mutex<Console> = Mutex::new(Console::new());
 /// Internal function called by the kprint[ln]! macros.
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    #[cfg(not(test))]
+    #[cfg(test)]
     {
         use core::fmt::Write;
         let mut console = CONSOLE.lock();

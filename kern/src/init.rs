@@ -25,7 +25,7 @@ unsafe fn zeros_bss() {
 }
 
 #[no_mangle]
-unsafe fn kinit() {
+unsafe fn kinit() -> ! {
     zeros_bss();
     kmain();
 }
