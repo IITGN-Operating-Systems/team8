@@ -1,10 +1,6 @@
 use core::fmt;
 use pi::uart::MiniUart;
 use shim::io;
-use core::result::Result::Ok;
-use shim::io::Write;
-use core::option::Option;
-use core::option::Option::{Some, None};
 use crate::mutex::Mutex;
 
 /// A global singleton allowing read/write access to the console.
@@ -89,7 +85,7 @@ pub fn _print(args: fmt::Arguments) {
 pub macro kprintln {
     () => (kprint!("\n")),
     ($fmt:expr) => (kprint!(concat!($fmt, "\n"))),
-    ($fmt:expr, $($arg:tt)) => (kprint!(concat!($fmt, "\n"), $($arg)))
+    ($fmt:expr, $($arg:tt)*) => (kprint!(concat!($fmt, "\n"), $($arg)*)),
 }
 
 /// Like print!, but for kernel-space.
