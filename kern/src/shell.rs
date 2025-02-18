@@ -1,6 +1,12 @@
 use stack_vec::StackVec;
-use std::path::PathBuf;
-use crate::console::{kprint, kprintln, CONSOLE};
+use crate::console::{kprint, CONSOLE};
+// use shim::path::{Path, PathBuf};
+use shim::io;
+use core::str;
+// use shim::io::{Read, Seek, SeekFrom};
+// use pi::timer::current_time;
+use crate::kprintln;
+use core::arch::asm;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -25,7 +31,7 @@ impl<'a> Command<'a> {
     fn parse(s: &'a str, buf: &'a mut [&'a str]) -> Result<Command<'a>, Error> {
         let mut args = StackVec::new(buf);
         for arg in s.split(' ').filter(|a| !a.is_empty()) {
-            args.push(arg).map_err(|_| Error::TooManyArgs)?;
+            args.push(arg).map_err(|_| Error::TooManyArgs)?;                //if size of args exceeds 64, return error
         }
 
         if args.is_empty() {
@@ -46,14 +52,20 @@ impl<'a> Command<'a> {
 pub fn shell(prefix: &str) {
     let mut line = [0u8; 512];
     let mut buf = StackVec::new(&mut line);
-    let mut pwd = PathBuf::from("/");
     let mut exit = false;
+    // kprintln!("Welcome to Rustberry Pi!");
+    kprintln!("Team Let's Get Rusty Welcomes you to...");
+    kprintln!(" ██████   ██████   ██████");
+    kprintln!(" ██      ██    ██  ██    ");
+    kprintln!(" ██████  ██    ██  ██████");
+    kprintln!("     ██  ██    ██      ██");
+    kprintln!(" ██████   ██████   ██████");
     while !exit{
-        kprint!("{} {}", pwd.to_str().unwrap(), prefix);
+        // kprint!("{} {}", pwd.to_str().unwrap(), prefix);
+        kprint!("{}", prefix);
         read_command(&mut buf);
-        exit = execute_command(&mut buf, &mut pwd);
+        exit = execute_command(&mut buf);
     }
-
 }
 
 fn read_command(mut buf: &mut StackVec<u8>) {
@@ -63,51 +75,46 @@ fn read_command(mut buf: &mut StackVec<u8>) {
             8 | 127 => backspace(&mut buf),
             b'\r' | b'\n' => break,
             32..=126 => store_command(&mut buf, input),
-            _ => ring_bell(),
+            _ => ring_bell_sound(),
         }
     }
 }
 
 fn backspace(buf: &mut StackVec<u8>) {
     if buf.is_empty() {
-        ring_bell();
+        ring_bell_sound();
     } else {
         kprint!("\u{8} \u{8}");
         buf.pop();
     }
 }
 
-fn ring_bell() {
+fn ring_bell_sound() {
     kprint!("\u{7}");
 }
 
 fn store_command(buf: &mut StackVec<u8>, input: u8) {
     match buf.push(input) {
         Ok(_) => CONSOLE.lock().write_byte(input),
-        Err(_) => ring_bell()
+        Err(_) => ring_bell_sound()
     }
 }
 
-fn execute_command(buf: &mut StackVec<u8>, pwd: &mut PathBuf) -> bool {
-    let cmd = Command::parse(str::from_utf8(buf.as_slice()).unwrap(), &mut [""; 64]);
+fn execute_command(buf: &mut StackVec<u8>) -> bool {
+    kprint!("\r\n");
+    let mut binding = [""; 64];
+    let cmd = Command::parse(str::from_utf8(buf.as_slice()).unwrap(), &mut binding);
 
     match cmd {
         Ok(cmd) => {
             match cmd.path() {
                 "exit" => return true,
-                "ls" => s_ls(pwd),
-                "pwd" => s_pwd(pwd),
                 "echo" => s_echo(&cmd.args[1..]),
-                "cd" => s_cd(pwd, &cmd.args[1..]),
-                "cat" => s_cat(pwd, &cmd.args[1..]),
-                "sleep" => s_sleep(cmd.args[1]),
-                "time" => s_time(),
-                _ => kprint!("command not found\r\n")
+                _ => kprint!("{}: command not found\r\n", cmd.path())
             }
         },
         Err(Error::TooManyArgs) => kprint!("too many arguments\r\n"),
         _ => {}
-
     }
     buf.truncate(0);
     false
@@ -115,22 +122,13 @@ fn execute_command(buf: &mut StackVec<u8>, pwd: &mut PathBuf) -> bool {
 
 // -----------------------------------Implementing shell commands-----------------------------------
 
-fn s_ls(pwd: &mut PathBuf) {
-    let dir: Option<Dir> = FILE_SYSTEM.get().open_dir(pwd.as_path()).ok();
-    let entries = dir.unwrap().entries().unwrap();
-    for d in entries {
-        if d.is_file() {
-            kprint!("-");
-        } else {
-            kprint!("d");
-        }
-        kprint!("\t{}\r\n", d.name());
-    }
-}
+// fn s_ls(pwd: &mut PathBuf) {
+//     unimplemented!();
+// }
 
-fn s_pwd(pwd: &mut PathBuf) {
-    kprint!("{}\r\n", pwd.to_str().unwrap());
-}
+// fn s_pwd(pwd: &mut PathBuf) {
+//     unimplemented!();
+// }
 
 fn s_echo(args: &[&str]) {
     for arg in args {
@@ -139,79 +137,33 @@ fn s_echo(args: &[&str]) {
     kprint!("\r\n");
 }
 
-fn s_cd(pwd: &mut PathBuf, args: &[&str]) {
-    let target = match args.len() {
-        0 => "/",
-        _ => args[0],
-    };
+// fn s_cd(pwd: &mut PathBuf, args: &[&str]) {
+//     unimplemented!();
+// }
 
-    match target {
-        ".." => { pwd.pop(); }
-        "." => {}
-        _ => {
-            let mut new_dir = pwd.clone();
-            new_dir.push(target);
-
-            let dir = FILE_SYSTEM.get().open_dir(new_dir.as_path());
-            match dir {
-                Ok(_) => {
-                    pwd.push(target);
-                }
-                Err(err) => kprint!("{}\r\n",err)
-            }
-        }
-    }
-}
-
-fn s_cat(pwd: &mut PathBuf, args: &[&str]) {
-    for filename in args {
-        let mut file = pwd.clone();
-        file.push(filename);
-        match FILE_SYSTEM.get().open_file(file.as_path()) {
-            Ok(mut f) => {
-                let mut offset = 0;
-                loop {
-                    let _ = f.seek(SeekFrom::Current(offset));
-                    let mut buf = [0u8; 512];
-                    let bytes_read = f.read(&mut buf).unwrap() as i64;
-                    if bytes_read == 0 {
-                        break;
-                    } else {
-                        offset += bytes_read;
-                        kprint!("{}", String::from_utf8_lossy(&buf));
-                    }
-                }
-            }
-            Err(err) => kprint!("{}\r\n",err)
-        }
-    }
-}
+// fn s_cat(pwd: &mut PathBuf, args: &[&str]) {
+//     unimplemented!();
+// }
 
 fn s_sleep(arg: &str) {
-    let ms = u32::from_str(arg).unwrap();
+    let ms = core::str::FromStr::from_str(arg).unwrap();
     let actual = sys_call_sleep(ms).unwrap();
     kprint!("elapsed {} ms\r\n", actual);
 }
 
-fn s_time() {
-    kprint!("{}\r\n", current_time());
-}
+// fn s_time() {
+//     kprint!("{:?}\r\n", current_time());
+// }
 
-fn sys_call_sleep(ms: u32) -> Result<u32, std::io::Error> {
+fn sys_call_sleep(ms: u32) -> Result<u32, io::Error> {
     let error: u64;
     let result: u64;
     unsafe {
-        asm!("mov x0, $2
-              svc 1
-              mov $0, x0
-              mov $1, x7"
-              : "=r"(result), "=r"(error)
-              : "r"(ms)
-              : "x0", "x7")
+        asm!("svc 1", inout("x0") ms as u64 => result, lateout("x1") error);
     }
 
     if error != 0 {
-        Err(std::io::Error::new(std::io::ErrorKind::Other, ""))
+        Err(shim::io::Error::new(shim::io::ErrorKind::Other, "Error in sleep"))
     } else {
         Ok(result as u32)
     }
