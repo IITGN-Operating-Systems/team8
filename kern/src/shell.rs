@@ -1,7 +1,13 @@
 use stack_vec::StackVec;
+use console::{kprint, CONSOLE};
+use std::str;
 use std::path::PathBuf;
-use crate::console::{kprint, kprintln, CONSOLE};
-
+use FILE_SYSTEM;
+use fat32::traits::{FileSystem, Dir as _Dir, Entry};
+use fat32::vfat::Dir;
+use std::io::{Read, Seek, SeekFrom};
+use std::str::FromStr;
+use pi::timer::current_time;
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
 enum Error {
@@ -25,7 +31,7 @@ impl<'a> Command<'a> {
     fn parse(s: &'a str, buf: &'a mut [&'a str]) -> Result<Command<'a>, Error> {
         let mut args = StackVec::new(buf);
         for arg in s.split(' ').filter(|a| !a.is_empty()) {
-            args.push(arg).map_err(|_| Error::TooManyArgs)?;
+            args.push(arg).map_err(|_| Error::TooManyArgs)?;                //if size of args exceeds 64, return error
         }
 
         if args.is_empty() {
@@ -48,6 +54,7 @@ pub fn shell(prefix: &str) {
     let mut buf = StackVec::new(&mut line);
     let mut pwd = PathBuf::from("/");
     let mut exit = false;
+    kprintln!("Welcome to Rustberry Pi!");
     while !exit{
         kprint!("{} {}", pwd.to_str().unwrap(), prefix);
         read_command(&mut buf);
@@ -63,28 +70,28 @@ fn read_command(mut buf: &mut StackVec<u8>) {
             8 | 127 => backspace(&mut buf),
             b'\r' | b'\n' => break,
             32..=126 => store_command(&mut buf, input),
-            _ => ring_bell(),
+            _ => ring_bell_sound(),
         }
     }
 }
 
 fn backspace(buf: &mut StackVec<u8>) {
     if buf.is_empty() {
-        ring_bell();
+        ring_bell_sound();
     } else {
         kprint!("\u{8} \u{8}");
         buf.pop();
     }
 }
 
-fn ring_bell() {
+fn ring_bell_sound() {
     kprint!("\u{7}");
 }
 
 fn store_command(buf: &mut StackVec<u8>, input: u8) {
     match buf.push(input) {
         Ok(_) => CONSOLE.lock().write_byte(input),
-        Err(_) => ring_bell()
+        Err(_) => ring_bell_sound()
     }
 }
 
