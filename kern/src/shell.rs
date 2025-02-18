@@ -4,7 +4,7 @@ use crate::console::{kprint, CONSOLE};
 use shim::io;
 use core::str;
 // use shim::io::{Read, Seek, SeekFrom};
-// use pi::timer::current_time;
+use pi::timer::current_time;
 use crate::kprintln;
 use core::arch::asm;
 
@@ -110,7 +110,17 @@ fn execute_command(buf: &mut StackVec<u8>) -> bool {
             match cmd.path() {
                 "exit" => return true,
                 "echo" => s_echo(&cmd.args[1..]),
-                _ => kprint!("{}: command not found\r\n", cmd.path())
+                "time" => s_time(),
+                "sleep" => {
+                    if cmd.args.len() == 2 {
+                        s_sleep(cmd.args[1]);
+                    } else if cmd.args.len() == 1 {
+                        kprint!("sleep: Argument Required!\r\nUsage: sleep <ms>\r\n");
+                    } else {
+                        kprint!("sleep: Too many arguments!\r\nUsage: sleep <ms>\r\n");
+                    }
+                }
+                _ => kprint!("{}: command not found\r\n", cmd.path())   
             }
         },
         Err(Error::TooManyArgs) => kprint!("too many arguments\r\n"),
@@ -146,25 +156,28 @@ fn s_echo(args: &[&str]) {
 // }
 
 fn s_sleep(arg: &str) {
-    let ms = core::str::FromStr::from_str(arg).unwrap();
-    let actual = sys_call_sleep(ms).unwrap();
-    kprint!("elapsed {} ms\r\n", actual);
+    let ms = arg.parse::<u32>();
+    match ms {
+        Ok(ms) => {
+            match sys_call_sleep(ms) {
+                Ok(_) => kprint!("sleep: done\r\n"),
+                Err(_) => kprint!("sleep: error\r\n")
+            }
+        },
+        Err(_) => {
+            kprint!("sleep: Invalid Argument\r\n");
+            kprint!("usage: sleep <ms>\r\n");
+        }
+    }
 }
 
-// fn s_time() {
-//     kprint!("{:?}\r\n", current_time());
-// }
+fn s_time() {
+    kprint!("System has been running for {:?}.\r\n", current_time());
+}
 
 fn sys_call_sleep(ms: u32) -> Result<u32, io::Error> {
-    let error: u64;
-    let result: u64;
-    unsafe {
-        asm!("svc 1", inout("x0") ms as u64 => result, lateout("x1") error);
-    }
-
-    if error != 0 {
-        Err(shim::io::Error::new(shim::io::ErrorKind::Other, "Error in sleep"))
-    } else {
-        Ok(result as u32)
-    }
+    let start = current_time();
+    let end = start + core::time::Duration::from_millis(ms as u64);
+    while current_time() < end {}
+    Ok(ms)
 }
