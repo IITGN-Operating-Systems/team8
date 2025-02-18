@@ -54,12 +54,12 @@ pub fn shell(prefix: &str) {
     let mut buf = StackVec::new(&mut line);
     let mut exit = false;
     // kprintln!("Welcome to Rustberry Pi!");
-    kprintln!("Welcome to...");
-    kprintln!("██████   ██████   ██████");
-    kprintln!("██      ██    ██  ██    ");
-    kprintln!("██████  ██    ██  ██████");
-    kprintln!("    ██  ██    ██      ██");
-    kprintln!("██████   ██████   ██████");
+    kprintln!("Team Let's Get Rusty Welcomes you to...");
+    kprintln!(" ██████   ██████   ██████");
+    kprintln!(" ██      ██    ██  ██    ");
+    kprintln!(" ██████  ██    ██  ██████");
+    kprintln!("     ██  ██    ██      ██");
+    kprintln!(" ██████   ██████   ██████");
     while !exit{
         // kprint!("{} {}", pwd.to_str().unwrap(), prefix);
         kprint!("{}", prefix);
@@ -110,7 +110,7 @@ fn execute_command(buf: &mut StackVec<u8>) -> bool {
             match cmd.path() {
                 "exit" => return true,
                 "echo" => s_echo(&cmd.args[1..]),
-                _ => kprint!("command not found\r\n")
+                _ => kprint!("{}: command not found\r\n", cmd.path())
             }
         },
         Err(Error::TooManyArgs) => kprint!("too many arguments\r\n"),
