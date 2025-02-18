@@ -55,10 +55,10 @@ pub fn shell(prefix: &str) {
     let mut exit = false;
     // kprintln!("Welcome to Rustberry Pi!");
     kprintln!("Welcome to...");
-    kprintln!(" ██████   ██████    ███████");
-    kprintln!("██       ██    ██  ██      ");
-    kprintln!(" █████   ██    ██   █████  ");
-    kprintln!("     ██  ██    ██       ██ ");
+    kprintln!(" ██████   ██████   ██████");
+    kprintln!(" ██      ██    ██  ██      ");
+    kprintln!(" ██████  ██    ██  ██████  ");
+    kprintln!("     ██  ██    ██      ██ ");
     kprintln!(" ██████   ██████   ██████  ");
     while !exit{
         // kprint!("{} {}", pwd.to_str().unwrap(), prefix);
