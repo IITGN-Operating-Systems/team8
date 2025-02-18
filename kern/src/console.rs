@@ -21,15 +21,15 @@ impl Console {
     /// Initializes the console if it's not already initialized.
     #[inline]
     fn initialize(&mut self) {
-        if self.inner.is_none() {
-            self.inner = Some(MiniUart::new());
-        }
+        self.inner = Some(MiniUart::new())
     }
 
     /// Returns a mutable borrow to the inner MiniUart, initializing it as
     /// needed.
     fn inner(&mut self) -> &mut MiniUart {
-        self.initialize();
+        if self.inner.is_none(){
+            self.initialize();
+        }
         self.inner.as_mut().unwrap()
     }
 
@@ -52,8 +52,7 @@ impl io::Read for Console {
 
 impl io::Write for Console {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner().write(buf);
-        Ok(buf.len())
+        self.inner().write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -63,8 +62,7 @@ impl io::Write for Console {
 
 impl fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.inner().write(s.as_bytes());
-        Ok(())
+        self.inner().write_str(s)
     }
 }
 
