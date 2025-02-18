@@ -23,12 +23,18 @@ use core::fmt::Write;
 // use shell::shell;
 
 fn kmain() -> ! {
-    kprintln!("Welcome to Rustberry Pi!");
-    let mut u = MiniUart::new();
+    // kprintln!("Welcome to Rustberry Pi!");
+    // // initialize the shell
+    // let mut u = MiniUart::new();
 
+    // loop {
+    //     let b = u.read_byte();
+    //     u.write_byte(b);
+    //     // u.write_str("hi\n");
+    // }
+
+    shell::shell("$ ");
+    kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
     loop {
-        let b = u.read_byte();
-        u.write_byte(b);
-        // u.write_str("hi\n");
     }
 }

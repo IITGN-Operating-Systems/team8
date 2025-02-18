@@ -4,7 +4,7 @@ use crate::console::{kprint, CONSOLE};
 use shim::io;
 use core::str;
 // use shim::io::{Read, Seek, SeekFrom};
-use pi::timer::current_time;
+// use pi::timer::current_time;
 use crate::kprintln;
 use core::arch::asm;
 
@@ -53,14 +53,19 @@ pub fn shell(prefix: &str) {
     let mut line = [0u8; 512];
     let mut buf = StackVec::new(&mut line);
     let mut exit = false;
-    kprintln!("Welcome to Rustberry Pi!");
+    // kprintln!("Welcome to Rustberry Pi!");
+    kprintln!("Welcome to...");
+    kprintln!(" ██████   ██████    ███████");
+    kprintln!("██       ██    ██  ██      ");
+    kprintln!(" █████   ██    ██   █████  ");
+    kprintln!("     ██  ██    ██       ██ ");
+    kprintln!(" ██████   ██████   ██████  ");
     while !exit{
         // kprint!("{} {}", pwd.to_str().unwrap(), prefix);
         kprint!("{}", prefix);
         read_command(&mut buf);
         exit = execute_command(&mut buf);
     }
-
 }
 
 fn read_command(mut buf: &mut StackVec<u8>) {
@@ -96,6 +101,7 @@ fn store_command(buf: &mut StackVec<u8>, input: u8) {
 }
 
 fn execute_command(buf: &mut StackVec<u8>) -> bool {
+    kprint!("\r\n");
     let mut binding = [""; 64];
     let cmd = Command::parse(str::from_utf8(buf.as_slice()).unwrap(), &mut binding);
 
@@ -145,9 +151,9 @@ fn s_sleep(arg: &str) {
     kprint!("elapsed {} ms\r\n", actual);
 }
 
-fn s_time() {
-    kprint!("{:?}\r\n", current_time());
-}
+// fn s_time() {
+//     kprint!("{:?}\r\n", current_time());
+// }
 
 fn sys_call_sleep(ms: u32) -> Result<u32, io::Error> {
     let error: u64;
