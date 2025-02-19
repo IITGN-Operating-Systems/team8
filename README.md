@@ -10,6 +10,7 @@
 - Md Sibtain Raza (22110148)
 
 # Lab 3
+
 ## SubPhase A: `Stack-Vec`
 
 **Question**: Why does push return a Result?
@@ -59,11 +60,12 @@ Vec owns its elements, so it can move them out of the vector without cloning.
 **Answer**: The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
 
 # Lab 4
+
 ## SubPhase A: `Getting Started`
 
 ## SubPhase B: `System Timer`
 
-**Question**:  Why can’t you write to CLO or CHI? (restricted-reads) The BCM2837 documentation states that the CLO and CHI registers are read-only. Our code enforces this property. How? What prevents us from writing to CLO or CHI?
+**Question**: Why can’t you write to CLO or CHI? (restricted-reads) The BCM2837 documentation states that the CLO and CHI registers are read-only. Our code enforces this property. How? What prevents us from writing to CLO or CHI?
 
 **Answer**: The code enforces that `CLO` and `CHI` are read-only by declaring them as `ReadVolatile<u32>`. This type only provides a method for reading the value, which prevents any write operations. If they were declared as `Volatile<u32>`, the API would allow writes, which could lead to accidental modifications of registers that are specified as read-only by the BCM2837 documentation, potentially causing undefined behavior or hardware errors.
 
@@ -88,7 +90,11 @@ The `_print` helper function calls `write_fmt` on an instance of `MutexGuard<Con
 
 ## SubPhase E: `Shell`
 
-**Question**:  How does your shell tie the many pieces together? (shell-lookback)
+<div align = "center">
+    <img src = "./shell.png" style="width: 100%">
+</div>
+
+**Question**: How does your shell tie the many pieces together? (shell-lookback)
 Your shell makes use of much of the code you’ve written. Briefly explain: which pieces does it makes use of and in what way?
 
 **Answer**: The `shell.rs` ties together various components of the system by leveraging the code written for `StackVec`, `TTYWrite`, `XMODEM`, `UART`, `Console`, `GPIO`, and `System Timer`. Here's a brief explanation of how each piece is utilized:
@@ -131,7 +137,7 @@ To use these dependencies, we have to use older nightly versions of Rust.
 
 ## Can we use latest Rust nightly?
 
-You are free to port the code over to newer versions, and will recieve significant 
+You are free to port the code over to newer versions, and will recieve significant
 bonus points for it. We will try to help you if you get stuck.  
 But sadly, this endeavour will not be considered for deadline extension. ¯\\\_(ツ)\_/¯
 
