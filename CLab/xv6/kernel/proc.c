@@ -126,6 +126,8 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->priority = 0;
+  if (p->pid == 1)
+    p->priority = 20;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0)
@@ -319,8 +321,6 @@ int fork(void)
 
   pid = np->pid;
 
-  np->priority = p->priority;
-
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -463,6 +463,7 @@ void scheduler(void)
   struct cpu *c = mycpu();
 
   c->proc = 0;
+  c->context_switches = 0;
   for (;;)
   {
     // The most recent process to run may have had interrupts
@@ -483,6 +484,30 @@ void scheduler(void)
         c->proc = p;
         swtch(&c->context, &p->context);
 
+        c->context_switches++;
+        // printf("CPU %d: Context Switches = %d\n", cpuid(), c->context_switches);
+        if (c->context_switches >= 3)
+        {
+          char *proc_type = "Unknown";
+          if (p->parent == 0)
+            proc_type = "Kernel";
+          else
+            proc_type = "User";
+
+          printf("\t\t\t\t\t330\t=== Third Context Switch on CPU %d | %s Process: %s (PID: %d, Parent PID: %d, Priority: %d) ===\n",
+                 cpuid(),
+                 proc_type,
+                 p->name,
+                 p->pid,
+                 p->parent ? p->parent->pid : 0,
+                 p->priority);
+          // printf("330\n");
+          c->context_switches = 0;
+          for (int i = 0; i < 1000000000; i++)
+          {
+            asm volatile("nop");
+          }
+        }
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;

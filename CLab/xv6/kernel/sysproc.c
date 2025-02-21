@@ -113,7 +113,9 @@ sys_setPriority(void)
   struct proc *current = myproc();
 
   if (pid == current->pid)
+  {
     return -1;
+  }
 
   struct proc *target = 0;
 
