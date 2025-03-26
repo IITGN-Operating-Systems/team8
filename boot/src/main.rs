@@ -15,7 +15,7 @@ use pi;
 const BINARY_START_ADDR: usize = 0x80000;
 const BOOTLOADER_START_ADDR: usize = 0x4000000;
 
-/// Pointer to where the loaded binary expects to be laoded.
+/// Pointer to where the loaded binary expects to be loaded.
 const BINARY_START: *mut u8 = BINARY_START_ADDR as *mut u8;
 
 /// Free space between the bootloader and the loaded binary's start address.

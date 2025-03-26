@@ -1,12 +1,21 @@
-use stack_vec::StackVec;
-use crate::console::{kprint, CONSOLE};
-// use shim::path::{Path, PathBuf};
 use shim::io;
+use shim::path::{Path, PathBuf};
 use core::str;
-// use shim::io::{Read, Seek, SeekFrom};
 use pi::timer::current_time;
 use crate::kprintln;
 use core::arch::asm;
+use crate::console::{kprint, CONSOLE};
+
+use stack_vec::StackVec;
+
+use pi::atags::Atags;
+
+use fat32::traits::FileSystem;
+use fat32::traits::{Dir, Entry};
+
+use crate::console::{kprint, kprintln, CONSOLE};
+use crate::ALLOCATOR;
+use crate::FILESYSTEM;
 
 /// Error type for `Command` parse failures.
 #[derive(Debug)]
@@ -48,6 +57,7 @@ impl<'a> Command<'a> {
 }
 
 /// Starts a shell using `prefix` as the prefix for each line. This function
+<<<<<<< HEAD
 /// returns if the `exit` command is called.
 pub fn shell(prefix: &str) {
     let mut line = [0u8; 512];
@@ -180,4 +190,9 @@ fn sys_call_sleep(ms: u32) -> Result<u32, io::Error> {
     let end = start + core::time::Duration::from_millis(ms as u64);
     while current_time() < end {}
     Ok(ms)
+=======
+/// never returns.
+pub fn shell(prefix: &str) -> ! {
+    unimplemented!()
+>>>>>>> skeleton/lab5
 }

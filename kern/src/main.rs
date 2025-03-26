@@ -11,7 +11,11 @@
 #[cfg(not(test))]
 mod init;
 
+extern crate alloc;
+
+pub mod allocator;
 pub mod console;
+pub mod fs;
 pub mod mutex;
 pub mod shell;
 
@@ -19,22 +23,19 @@ use console::{kprint,kprintln};
 use pi::uart::MiniUart;
 use core::fmt::Write;
 
-// import shell
-// use shell::shell;
+use allocator::Allocator;
+use fs::FileSystem;
+
+#[cfg_attr(not(test), global_allocator)]
+pub static ALLOCATOR: Allocator = Allocator::uninitialized();
+pub static FILESYSTEM: FileSystem = FileSystem::uninitialized();
 
 fn kmain() -> ! {
-    // kprintln!("Welcome to Rustberry Pi!");
-    // // initialize the shell
-    // let mut u = MiniUart::new();
-
-    // loop {
-    //     let b = u.read_byte();
-    //     u.write_byte(b);
-    //     // u.write_str("hi\n");
-    // }
-
-    shell::shell("$ ");
-    kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
-    loop {
+    unsafe {
+        ALLOCATOR.initialize();
+        FILESYSTEM.initialize();
     }
+
+    kprintln!("Welcome to cs330!");
+    shell::shell("> ");
 }
