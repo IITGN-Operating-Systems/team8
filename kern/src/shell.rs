@@ -57,7 +57,6 @@ impl<'a> Command<'a> {
 }
 
 /// Starts a shell using `prefix` as the prefix for each line. This function
-<<<<<<< HEAD
 /// returns if the `exit` command is called.
 pub fn shell(prefix: &str) {
     let mut line = [0u8; 512];
@@ -190,9 +189,4 @@ fn sys_call_sleep(ms: u32) -> Result<u32, io::Error> {
     let end = start + core::time::Duration::from_millis(ms as u64);
     while current_time() < end {}
     Ok(ms)
-=======
-/// never returns.
-pub fn shell(prefix: &str) -> ! {
-    unimplemented!()
->>>>>>> skeleton/lab5
 }
