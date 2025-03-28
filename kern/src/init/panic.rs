@@ -1,5 +1,8 @@
 use core::panic::PanicInfo;
 
+// may need kprintln!() instead of println!() -> Let's see
+// use crate::console::kprintln;
+
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     println!("            (");
@@ -19,10 +22,12 @@ fn panic(_info: &PanicInfo) -> ! {
         println!("FILE: {}", location.file());
         println!("LINE: {}", location.line());
         println!("COLUMN: {}", location.column());
-        println!();
-        println!("{}", _info.message().unwrap_or(&"<no message>"));
+    } 
+    println!();
+    if let Some(message) = _info.message() {
+        println!("{:?}", message);
     } else {
-        println!("Panic: {}", _info.message().unwrap_or(&"<no message>"));
+        println!("MESSAGE: None");
     }
     loop {}
 }
