@@ -11,7 +11,7 @@
 #[cfg(not(test))]
 mod init;
 
-extern crate alloc;
+// extern crate alloc;
 
 pub mod allocator;
 pub mod console;
@@ -36,6 +36,10 @@ fn kmain() -> ! {
         FILESYSTEM.initialize();
     }
 
-    kprintln!("Welcome to cs330!");
-    shell::shell("> ");
+    // kprintln!("Welcome to cs330!");
+    // shell::shell("> ");
+    shell::shell("$ ");
+    kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+    loop {
+    }
 }
