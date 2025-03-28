@@ -9,55 +9,91 @@
 - Hitesh Kumar (22110098)
 - Md Sibtain Raza (22110148)
 
-# Lab 3
+# Lab 5
 
-## SubPhase A: `Stack-Vec`
+## Phase 0: `Getting Started`
 
-**Question**: Why does push return a Result?
+## Phase 1: `Memory Lane`
 
-**Answer**: `StackVec::push` can fail because the backing storage has a fixed capacity. If the StackVec is full, push returns an Err to indicate that the operation failed.
-Vec dynamically allocates memory, so it can grow as needed. StackVec cannot grow beyond its fixed capacity, so push must handle the case where the vector is full.
+### SubPhase A: `Panic!`
 
-**Question**: Why is the `'a` bound on `T` required?
+The file to work in `./kern/init/panic.rs` and the function to implement is `panic!`. In order to run without the `FAT32` filesystem, we need to modify the `Makefile`, `qemu.sh` and `./kern/Cargo.toml` files.
 
-**Answer**: The 'a bound ensures that any references inside T (if T contains references) are valid for the lifetime 'a of the backing storage. Without this bound, StackVec could store references that outlive the backing storage, leading to dangling references (accessing invalid memory).
-Vec owns its elements, so it can move them out of the vector without cloning.
+```toml
+[dependencies]
+pi = { path = "../lib/pi" }
+shim = { path = "../lib/shim", features = ["no_std", "alloc"] }
+stack-vec = { path = "../lib/stack-vec/" }
+# fat32 = { path = "../lib/fat32/", features = ["no_std"] }
 
-**Question**: Why does `StackVec` require `T: Clone` to `pop()`?
+# commented out the fat32 dependency
+```
 
-**Answer**: `StackVec::pop` removes the last element from the vector and returns it. Since StackVec borrows its storage (it doesn’t own the elements), it cannot move elements out of the slice directly. Instead, it clones the element before removing it.
+In `./kern/Makefile` added a new target `qemu-n` specifying the simple kernel without the `FAT32`
 
-**Question**: Which Tests Use `Deref` and `DerefMut`?
+```bash
+qemu-n: bin
+	./qemu.sh build/$(KERN).bin
 
-**Answer**:
+qemu: bin
+	./qemu.sh build/$(KERN).bin -drive file=$(SDCARD),format=raw,if=sd $(QEMU_ARGS)
+```
 
-- **Tests Using Deref**: Any test that treats StackVec as a slice (e.g., indexing, slicing, or calling slice methods like len() or iter()).
-- **Tests Using DerefMut**: Any test that modifies StackVec as a slice (e.g., sorting or mutating elements).
-  All those tests will be failing if Deref and DrefMut are not implemented.
+hence in `./kern` run
 
-## SubPhase B: `Volatile`
+```bash
+make qemu-n
+```
 
-**Question**: Why does `Unique<Volatile>` exists? What is difference between `Volatile` and `Unique<Volatile>`?
+To compile and run the kernel without the `FAT32` filesystem, in `./kern` run:
 
-**Answer**: `Unique<Volatile>` is a wrapper around a raw pointer that ensures the pointer is unique (i.e., no other references point to the same memory). This is necessary because `Volatile` requires exclusive access to the memory it points to. If multiple references to the same memory existed, they could concurrently read or write to the memory, violating the guarantees provided by `Volatile`.
+```bash
+cargo run
+```
 
-**Question**: How are read-only and write-only accesses enforced? The `ReadVolatile` and `WriteVolatile` types make it impossible to write and read, respectively, the underlying pointer. How do they accomplish this?
+<div align = "center">
+    <img src = "./panic.png" style="width: 50%">
+</div>
 
-**Answer**: `ReadVolatile` and `WriteVolatile` enforce read-only and write-only accesses by wrapping a `Unique<Volatile>` pointer and providing methods that only allow reading or writing, respectively. For example, `ReadVolatile` provides a `read` method that reads the value at the pointer, while `WriteVolatile` provides a `write` method that writes a value to the pointer. These methods ensure that the underlying pointer is only used for the intended access type (read or write).
+### SubPhase B: `ATAGS`
 
-**Question**: What do the macros do? What do the `readable!`, `writeable!`, and `readable_writeable!` macros do?
+Files to be taken care of were: `lib/pi/src/atags/atag.rs` and `lib/pi/src/atags/raw.rs`
 
-**Answer**: The `readable!`, `writeable!`, and `readable_writeable!` macros generate implementations of the `Readable` and `Writeable` traits for the specified types. These traits provide methods for reading (`read_volatile `) and writing (`write_volatile`) values from/to memory, respectively. The macros generate implementations for the specified types, allowing them to be used with `ReadVolatile` and `WriteVolatile` to read and write values from/to memory.
+### SubPhase C: `Warming Up`
 
-## SubPhase D: `TTYWrite`
+Files to be taken care of were: `./kern/src/allocator/util.rs` and `./kern/src/allocator.rs`. There was one issue with `./kern/allocator.rs`:
 
-**Question**: What happens when a flag’s input is invalid?
+```rust
+// impl fmt::Debug for Allocator {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self.0.lock().as_mut() {
+//             Some(ref alloc) => write!(f, "{:?}", alloc)?,
+//             None => write!(f, "Not yet initialized")?,
+//         }
+//         Ok(())
+//     }
+// }
 
-**Answer**: `StructOpt` rejects invalid flag values because custom parsing functions (e.g., parse_flow_control) return a Result. For example, if -f idk is provided, parse_flow_control returns an Err, prompting `StructOpt` to display an error and exit. These parsers validate inputs by returning `Ok` only for valid values, ensuring invalid inputs are rejected early in argument parsing.
+// Changed to:
 
-**Question**: Why does the `test.sh` script always set -r? (bad-tests)
+impl fmt::Debug for Allocator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0.lock().as_mut() {
+            Some(ref alloc) => write!(f, "Allocator initialized at {:p}", alloc)?,
+            None => write!(f, "Not yet initialized")?,
+        }
+        Ok(())
+    }
+}
+```
 
-**Answer**: The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
+### SubPhase D: `Bump Allocator`
+
+`./kern/src/allocator/bump.rs`
+
+### SubPhase E: `Bin Allocator`
+
+`./kern/src/allocator/bin.rs`
 
 # Lab 4
 
@@ -114,6 +150,56 @@ Your shell makes use of much of the code you’ve written. Briefly explain: whic
 **System Timer**: The `System Timer` module is used for managing time-related functions within the shell. It allows the shell to implement features like command timeouts, delays, and scheduling tasks, ensuring that time-sensitive operations are handled accurately.
 
 By integrating these components, the shell can provide a robust and interactive environment for users to execute commands, manage files, and interact with the system hardware. Each piece plays a crucial role in ensuring the shell's functionality, reliability, and performance.
+
+# Lab 3
+
+## SubPhase A: `Stack-Vec`
+
+**Question**: Why does push return a Result?
+
+**Answer**: `StackVec::push` can fail because the backing storage has a fixed capacity. If the StackVec is full, push returns an Err to indicate that the operation failed.
+Vec dynamically allocates memory, so it can grow as needed. StackVec cannot grow beyond its fixed capacity, so push must handle the case where the vector is full.
+
+**Question**: Why is the `'a` bound on `T` required?
+
+**Answer**: The 'a bound ensures that any references inside T (if T contains references) are valid for the lifetime 'a of the backing storage. Without this bound, StackVec could store references that outlive the backing storage, leading to dangling references (accessing invalid memory).
+Vec owns its elements, so it can move them out of the vector without cloning.
+
+**Question**: Why does `StackVec` require `T: Clone` to `pop()`?
+
+**Answer**: `StackVec::pop` removes the last element from the vector and returns it. Since StackVec borrows its storage (it doesn’t own the elements), it cannot move elements out of the slice directly. Instead, it clones the element before removing it.
+
+**Question**: Which Tests Use `Deref` and `DerefMut`?
+
+**Answer**:
+
+- **Tests Using Deref**: Any test that treats StackVec as a slice (e.g., indexing, slicing, or calling slice methods like len() or iter()).
+- **Tests Using DerefMut**: Any test that modifies StackVec as a slice (e.g., sorting or mutating elements).
+  All those tests will be failing if Deref and DrefMut are not implemented.
+
+## SubPhase B: `Volatile`
+
+**Question**: Why does `Unique<Volatile>` exists? What is difference between `Volatile` and `Unique<Volatile>`?
+
+**Answer**: `Unique<Volatile>` is a wrapper around a raw pointer that ensures the pointer is unique (i.e., no other references point to the same memory). This is necessary because `Volatile` requires exclusive access to the memory it points to. If multiple references to the same memory existed, they could concurrently read or write to the memory, violating the guarantees provided by `Volatile`.
+
+**Question**: How are read-only and write-only accesses enforced? The `ReadVolatile` and `WriteVolatile` types make it impossible to write and read, respectively, the underlying pointer. How do they accomplish this?
+
+**Answer**: `ReadVolatile` and `WriteVolatile` enforce read-only and write-only accesses by wrapping a `Unique<Volatile>` pointer and providing methods that only allow reading or writing, respectively. For example, `ReadVolatile` provides a `read` method that reads the value at the pointer, while `WriteVolatile` provides a `write` method that writes a value to the pointer. These methods ensure that the underlying pointer is only used for the intended access type (read or write).
+
+**Question**: What do the macros do? What do the `readable!`, `writeable!`, and `readable_writeable!` macros do?
+
+**Answer**: The `readable!`, `writeable!`, and `readable_writeable!` macros generate implementations of the `Readable` and `Writeable` traits for the specified types. These traits provide methods for reading (`read_volatile `) and writing (`write_volatile`) values from/to memory, respectively. The macros generate implementations for the specified types, allowing them to be used with `ReadVolatile` and `WriteVolatile` to read and write values from/to memory.
+
+## SubPhase D: `TTYWrite`
+
+**Question**: What happens when a flag’s input is invalid?
+
+**Answer**: `StructOpt` rejects invalid flag values because custom parsing functions (e.g., parse_flow_control) return a Result. For example, if -f idk is provided, parse_flow_control returns an Err, prompting `StructOpt` to display an error and exit. These parsers validate inputs by returning `Ok` only for valid values, ensuring invalid inputs are rejected early in argument parsing.
+
+**Question**: Why does the `test.sh` script always set -r? (bad-tests)
+
+**Answer**: The `test.sh` script uses -r (raw mode) because XMODEM requires a responsive receiver for protocol handshakes (e.g., ACK/NAK). Testing with XMODEM would need a mock receiver that implements the protocol, which the script's PTY setup lacks. Raw mode bypasses this by transmitting data directly without protocol checks, simplifying validation of basic I/O functionality without complex two-way communication emulation.
 
 # CS330 Lab assignments
 

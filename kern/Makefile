@@ -24,6 +24,9 @@ elf:
 	@mkdir -p build
 	@cp -f $(TARGET) build/$(KERN).elf
 
+qemu-n: bin
+	./qemu.sh build/$(KERN).bin
+	
 qemu: bin
 	./qemu.sh build/$(KERN).bin -drive file=$(SDCARD),format=raw,if=sd $(QEMU_ARGS)
 
