@@ -31,7 +31,7 @@ stack-vec = { path = "../lib/stack-vec/" }
 
 In `./kern/Makefile` added a new target `qemu-n` specifying the simple kernel without the `FAT32`
 
-```bash
+```make
 qemu-n: bin
 	./qemu.sh build/$(KERN).bin
 
