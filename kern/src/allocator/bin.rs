@@ -16,7 +16,9 @@ use crate::allocator::LocalAlloc;
 ///   
 
 pub struct Allocator {
-    // FIXME: Add the necessary fields.
+    ll: [LinkedList; 30],
+    start: usize,
+    end: usize,
 }
 
 impl Allocator {

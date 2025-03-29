@@ -19,10 +19,11 @@ pub mod console;
 pub mod mutex;
 pub mod shell;
 
-use console::{kprint,kprintln};
+use console::kprintln;
 use pi::uart::MiniUart;
 use core::fmt::Write;
-
+// import stackVec present in /lib/stack-vec/src/lib.rs
+use stack_vec::StackVec;
 use allocator::Allocator;
 // use fs::FileSystem;
 
@@ -39,8 +40,16 @@ fn kmain() -> ! {
     // kprintln!("Welcome to cs330!");
     // shell::shell("> ");
 
-    shell::shell("$ ");
-    kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+    // shell::shell("$ ");
+    // kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+
+    let mut storage = [0; 50];
+    let mut v = StackVec::new(&mut storage);
+    for i in 0..50 {
+        v.push(i).unwrap();
+        kprintln!("{:?}", v);
+    }
+
     loop {
     }
 }

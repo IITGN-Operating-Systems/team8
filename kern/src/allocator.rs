@@ -3,8 +3,9 @@ mod util;
 
 mod bin;
 mod bump;
-
-type AllocatorImpl = bin::Allocator;
+use crate::allocator::util::*;
+// type AllocatorImpl = bin::Allocator;
+type AllocatorImpl = bump::Allocator;
 
 #[cfg(test)]
 mod tests;
@@ -12,7 +13,6 @@ mod tests;
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt;
 
-use crate::console::kprintln;
 use crate::mutex::Mutex;
 use pi::atags::{Atag, Atags};
 
@@ -94,7 +94,7 @@ pub fn memory_map() -> Option<(usize, usize)> {
     }
 
     if let (Some(start), Some(size)) = (start_addr, mem_size) {
-        let start = (start + page_size - 1) & !(page_size - 1); // Align to page size
+        let start = align_up(start, page_size);
         let end = start + size;
         if binary_end < start || binary_end >= end {
             return None;

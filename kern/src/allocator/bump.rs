@@ -48,6 +48,10 @@ impl LocalAlloc for Allocator {
     unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
         let aligned_current = align_up(self.current, layout.align());
         // check if the aligned address is within the bounds of the allocator
+        if layout.size() <= 0 {
+            // invalid size
+            return ptr::null_mut();
+        }
         let next = aligned_current.saturating_add(layout.size());
         if next > self.end {
             // not enough memory
