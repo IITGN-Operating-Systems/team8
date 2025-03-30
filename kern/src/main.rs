@@ -11,7 +11,7 @@
 #[cfg(not(test))]
 mod init;
 
-// extern crate alloc;
+extern crate alloc;
 
 pub mod allocator;
 pub mod console;
@@ -24,7 +24,6 @@ use pi::uart::MiniUart;
 use stack_vec::StackVec;
 use core::fmt::Write;
 // import stackVec present in /lib/stack-vec/src/lib.rs
-use stack_vec::StackVec;
 use allocator::Allocator;
 // use fs::FileSystem;
 
@@ -50,6 +49,16 @@ fn kmain() -> ! {
         v.push(i).unwrap();
         kprintln!("{:?}", v);
     }
+    for i in 0..50 {
+        v.pop().unwrap();
+        kprintln!("{:?}", v);
+    }
+    for i in 0..50 {
+        v.push(i+50).unwrap();
+        kprintln!("{:?}", v);
+    }   
+    v.push(100).unwrap();
+    kprintln!("{:?}", v);
 
     loop {
     }

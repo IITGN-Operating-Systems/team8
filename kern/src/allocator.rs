@@ -4,8 +4,8 @@ mod util;
 mod bin;
 mod bump;
 use crate::allocator::util::*;
-// type AllocatorImpl = bin::Allocator;
-type AllocatorImpl = bump::Allocator;
+type AllocatorImpl = bin::Allocator;
+// type AllocatorImpl = bump::Allocator;
 
 #[cfg(test)]
 mod tests;
