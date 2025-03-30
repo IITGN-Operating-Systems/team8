@@ -21,6 +21,7 @@ pub mod shell;
 
 use console::{kprint,kprintln};
 use pi::uart::MiniUart;
+use stack_vec::StackVec;
 use core::fmt::Write;
 
 use allocator::Allocator;
@@ -39,8 +40,14 @@ fn kmain() -> ! {
     // kprintln!("Welcome to cs330!");
     // shell::shell("> ");
 
-    shell::shell("$ ");
-    kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+    // shell::shell("$ ");
+    // kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+    let mut storage = [0; 50];
+    let mut v = StackVec::new(&mut storage);
+    for i in 0..16 {
+        v.push(i).unwrap();
+    }
+    kprintln!("StackVec: {:?}", v);
     loop {
     }
 }
