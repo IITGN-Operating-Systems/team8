@@ -19,11 +19,12 @@ pub mod console;
 pub mod mutex;
 pub mod shell;
 
-use console::{kprint,kprintln};
+use console::kprintln;
 use pi::uart::MiniUart;
 use stack_vec::StackVec;
 use core::fmt::Write;
-
+// import stackVec present in /lib/stack-vec/src/lib.rs
+use stack_vec::StackVec;
 use allocator::Allocator;
 // use fs::FileSystem;
 
@@ -42,12 +43,14 @@ fn kmain() -> ! {
 
     // shell::shell("$ ");
     // kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+
     let mut storage = [0; 50];
     let mut v = StackVec::new(&mut storage);
-    for i in 0..16 {
+    for i in 0..50 {
         v.push(i).unwrap();
+        kprintln!("{:?}", v);
     }
-    kprintln!("StackVec: {:?}", v);
+
     loop {
     }
 }

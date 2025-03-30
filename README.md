@@ -91,6 +91,40 @@ impl fmt::Debug for Allocator {
 
 `./kern/src/allocator/bump.rs`
 
+```rust
+use stack_vec::StackVec;
+use allocator::Allocator;
+
+#[cfg_attr(not(test), global_allocator)]
+pub static ALLOCATOR: Allocator = Allocator::uninitialized();
+
+fn kmain() -> ! {
+    unsafe {
+        ALLOCATOR.initialize();
+    }
+
+    let mut storage = [0; 50];
+    let mut v = StackVec::new(&mut storage);
+    for i in 0..50 {
+        v.push(i).unwrap();
+        kprintln!("{:?}", v);
+    }
+
+    loop {
+    }
+}
+```
+
+The `kmain` function initializes the allocator (BUMP) and creates a `StackVec` with a storage size of 50. It then pushes integers from 0 to 49 into the vector and prints its contents. Run in `./kern/`
+
+```bash
+make qemu-n
+```
+
+<div align = "center">
+    <img src = "./bump.png" style="width: 100%">
+</div>
+
 ### SubPhase E: `Bin Allocator`
 
 `./kern/src/allocator/bin.rs`
