@@ -22,9 +22,9 @@ pub mod shell;
 use console::kprintln;
 use pi::uart::MiniUart;
 use stack_vec::StackVec;
-use core::fmt::Write;
+use core::{alloc::GlobalAlloc, fmt::Write};
 // import stackVec present in /lib/stack-vec/src/lib.rs
-use allocator::Allocator;
+use allocator::{Allocator, LocalAlloc};
 // use fs::FileSystem;
 
 #[cfg_attr(not(test), global_allocator)]
@@ -42,20 +42,30 @@ fn kmain() -> ! {
 
     // shell::shell("$ ");
     // kprintln!("Shell exited. Press <Ctrl-A, X> to exit QEMU.");
+    // Allocator::alloc(&mut self, layout: Layout) -> Result<*mut u8, alloc::alloc::AllocError> {
+    let layout = alloc::alloc::Layout::from_size_align(50, 8).unwrap();
+    let storage = unsafe { ALLOCATOR.alloc(layout) };
 
-    let mut storage = [0; 50];
-    let mut v = StackVec::new(&mut storage);
+    if storage.is_null() {
+        panic!("Allocation failed");
+    }
+
+    kprintln!("Allocated {} bytes at address {:p}", layout.size(), storage);
+
+    let mut storage_slice = unsafe { core::slice::from_raw_parts_mut(storage, layout.size()) };
+    
+    let mut v = StackVec::new(storage_slice);
     for i in 0..50 {
         v.push(i).unwrap();
-        kprintln!("{:?}", v);
+        // kprintln!("{:?}", v);
     }
     for i in 0..50 {
         v.pop().unwrap();
-        kprintln!("{:?}", v);
+        // kprintln!("{:?}", v);
     }
     for i in 0..50 {
         v.push(i+50).unwrap();
-        kprintln!("{:?}", v);
+        // kprintln!("{:?}", v);
     }   
     v.push(100).unwrap();
     kprintln!("{:?}", v);
