@@ -11,6 +11,8 @@
 
 static size_t page_size;
 
+static int num_faults;
+
 // align_down - rounds a value down to an alignment
 // @x: the value
 // @a: the alignment (must be power of 2)
@@ -18,8 +20,8 @@ static size_t page_size;
 // Returns an aligned value.
 #define align_down(x, a) ((x) & ~((typeof(x))(a) - 1))
 
-#define AS_LIMIT  (1 << 25) // Maximum limit on virtual memory bytes
-#define MAX_SQRTS (1 << 27) // Maximum limit on sqrt table entries
+#define AS_LIMIT (1 << 25)  // Maximum limit on virtual memory bytes
+#define MAX_SQRTS (1 << 27) // Maximum limit on sqrt table entries
 static double *sqrts;
 
 // Use this helper function as an oracle for square root values.
@@ -35,12 +37,27 @@ calculate_sqrts(double *sqrt_pos, int start, int nr)
 static void
 handle_sigsegv(int sig, siginfo_t *si, void *ctx)
 {
-  // Your code here.
+  uintptr_t faulty_addr = (uintptr_t)si->si_addr;
+  double *page_base = (double *)align_down(faulty_addr, page_size);
+  static double *lastpage_base = NULL;
 
-  // replace these three lines with your implementation
-  uintptr_t fault_addr = (uintptr_t)si->si_addr;
-  printf("oops got SIGSEGV at 0x%lx\n", fault_addr);
-  exit(EXIT_FAILURE);
+  if (lastpage_base && munmap(lastpage_base, page_size) == -1)
+  {
+    fprintf(stderr, "Couldn't munmap(); %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  if (mmap(page_base, page_size, PROT_READ | PROT_WRITE,
+           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED)
+  {
+    fprintf(stderr, "Couldn't mmap(); %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  num_faults++;
+
+  calculate_sqrts(page_base, page_base - sqrts, page_size / sizeof(double));
+  lastpage_base = page_base;
 }
 
 static void
@@ -51,22 +68,25 @@ setup_sqrt_region(void)
 
   // Only mapping to find a safe location for the table.
   sqrts = mmap(NULL, MAX_SQRTS * sizeof(double) + AS_LIMIT, PROT_NONE,
-             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (sqrts == MAP_FAILED) {
+               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (sqrts == MAP_FAILED)
+  {
     fprintf(stderr, "Couldn't mmap() region for sqrt table; %s\n",
-          strerror(errno));
+            strerror(errno));
     exit(EXIT_FAILURE);
   }
 
   // Now release the virtual memory to remain under the rlimit.
-  if (munmap(sqrts, MAX_SQRTS * sizeof(double) + AS_LIMIT) == -1) {
+  if (munmap(sqrts, MAX_SQRTS * sizeof(double) + AS_LIMIT) == -1)
+  {
     fprintf(stderr, "Couldn't munmap() region for sqrt table; %s\n",
             strerror(errno));
     exit(EXIT_FAILURE);
   }
 
   // Set a soft rlimit on virtual address-space bytes.
-  if (setrlimit(RLIMIT_AS, &lim) == -1) {
+  if (setrlimit(RLIMIT_AS, &lim) == -1)
+  {
     fprintf(stderr, "Couldn't set rlimit on RLIMIT_AS; %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -75,7 +95,8 @@ setup_sqrt_region(void)
   act.sa_sigaction = handle_sigsegv;
   act.sa_flags = SA_SIGINFO;
   sigemptyset(&act.sa_mask);
-  if (sigaction(SIGSEGV, &act, NULL) == -1) {
+  if (sigaction(SIGSEGV, &act, NULL) == -1)
+  {
     fprintf(stderr, "Couldn't set up SIGSEGV handler;, %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -90,14 +111,16 @@ test_sqrt_region(void)
   printf("Validating square root table contents...\n");
   srand(0xDEADBEEF);
 
-  for (i = 0; i < 500000; i++) {
+  for (i = 0; i < 500000; i++)
+  {
     if (i % 2 == 0)
       pos = rand() % (MAX_SQRTS - 1);
     else
       pos += 1;
     printf("The numebr is %d\n", pos);
     calculate_sqrts(&correct_sqrt, pos, 1);
-    if (sqrts[pos] != correct_sqrt) {
+    if (sqrts[pos] != correct_sqrt)
+    {
       fprintf(stderr, "Square root is incorrect. Expected %f, got %f.\n",
               correct_sqrt, sqrts[pos]);
       exit(EXIT_FAILURE);
@@ -107,8 +130,7 @@ test_sqrt_region(void)
   printf("All tests passed!\n");
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   page_size = sysconf(_SC_PAGESIZE);
   printf("page_size is %ld\n", page_size);
