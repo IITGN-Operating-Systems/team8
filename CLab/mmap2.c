@@ -33,7 +33,7 @@ typedef struct
   unsigned long last_acc;   // For LRU and MRU: timestamp when last used.
   unsigned long insert_num; // (unused now but still present in the structure)
   unsigned long freq;       // (unused now but still present in the structure)
-  int ref_bit;              // For Clock algorithm: reference bit
+  int access_bit;           // For Clock algorithm: reference bit
 } page_info;
 
 static page_info *cache = NULL;          // Array of cached pages
@@ -82,7 +82,7 @@ static void print_cache()
       break;
 
     case REPLACEMENT_CLOCK:
-      printf(", ref_bit = %d", cache[i].ref_bit);
+      printf(", access_bit = %d", cache[i].access_bit);
       break;
 
     default:
@@ -148,10 +148,10 @@ handle_sigsegv(int sig, siginfo_t *si, void *ctx)
     }
     case REPLACEMENT_CLOCK:
     {
-      // Use Clock algorithm: search circularly for a page with ref_bit == 0.
+      // Use Clock algorithm: search circularly for a page with access_bit == 0.
       while (1)
       {
-        if (cache[clock_hand].ref_bit == 0)
+        if (cache[clock_hand].access_bit == 0)
         {
           victim_idx = clock_hand;
           clock_hand = (clock_hand + 1) % cache_slots;
@@ -159,8 +159,8 @@ handle_sigsegv(int sig, siginfo_t *si, void *ctx)
         }
         else
         {
-          // Give a second chance: reset the ref_bit and move on.
-          cache[clock_hand].ref_bit = 0;
+          // Give a second chance: reset the access_bit and move on.
+          cache[clock_hand].access_bit = 0;
           clock_hand = (clock_hand + 1) % cache_slots;
         }
       }
@@ -184,7 +184,7 @@ handle_sigsegv(int sig, siginfo_t *si, void *ctx)
     cache[victim_idx].insert_num = access_counter; // Not used now.
     cache[victim_idx].freq = 1;                    // Not used now.
     if (replacement_policy == REPLACEMENT_CLOCK)
-      cache[victim_idx].ref_bit = 1;
+      cache[victim_idx].access_bit = 1;
   }
   else
   {
@@ -194,7 +194,7 @@ handle_sigsegv(int sig, siginfo_t *si, void *ctx)
     cache[cache_count].insert_num = access_counter; // Not used now.
     cache[cache_count].freq = 1;                    // Not used now.
     if (replacement_policy == REPLACEMENT_CLOCK)
-      cache[cache_count].ref_bit = 1;
+      cache[cache_count].access_bit = 1;
     cache_count++;
   }
 
