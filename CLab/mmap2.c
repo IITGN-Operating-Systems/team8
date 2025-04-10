@@ -277,7 +277,7 @@ test_sqrt_region(void)
   start = clock();
 
   printf("Validating square root table contents (mixed access)...\n");
-  srand(0xDEADBEEF);
+  srand(0xDEADBEEE);
 
   for (i = 0; i < 500000; i++)
   {
