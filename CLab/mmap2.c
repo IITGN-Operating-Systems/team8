@@ -10,343 +10,264 @@
 #include <math.h>
 #include <time.h>
 
-// ************************* Global definitions and region setup *******************************
-
-// Align a value down to the nearest multiple of a given alignment.
-// Note: 'a' must be a power of 2.
-#define align_down(x, a) ((x) & ~((typeof(x))(a) - 1))
-
-#define AS_LIMIT (1 << 25)  // Maximum virtual memory limit in bytes
-#define MAX_SQRTS (1 << 27) // Maximum number of entries in the sqrt table
-
-static double *sqrts; // Pointer to the base of the square root table
 static size_t page_size;
 
-// Static Variables for Statistics
+// align_down - rounds a value down to an alignment
+// @x: the value
+// @a: the alignment (must be power of 2)
+#define align_down(x, a) ((x) & ~((typeof(x))(a) - 1))
+
+#define AS_LIMIT (1 << 25)  // Maximum limit on virtual memory bytes
+#define MAX_SQRTS (1 << 27) // Maximum limit on sqrt table entries
+static double *sqrts;
+
+// Global counters for quantitative measures.
 static unsigned long total_accesses = 0;
-static unsigned long num_faults = 0;
+static unsigned long page_faults = 0;
 static unsigned long evictions = 0;
 
-// ---------------------------------------------------------------------
-// Replacement policy types
-// ---------------------------------------------------------------------
+// Structure to track cached pages.
+typedef struct
+{
+  uintptr_t base;           // Base address of the page
+  unsigned long last_acc;   // For LRU and MRU: timestamp when last used.
+  unsigned long insert_num; // (unused now but still present in the structure)
+  unsigned long freq;       // (unused now but still present in the structure)
+  int ref_bit;              // For Clock algorithm: reference bit
+} page_info;
+
+static page_info *cache = NULL;          // Array of cached pages
+static int cache_count = 0;              // Number of pages currently cached
+static int cache_slots = 0;              // Maximum number of pages in the cache
+static unsigned long access_counter = 0; // Global counter for accesses
+
+// Global clock hand index for the Clock algorithm.
+static int clock_hand = 0;
+
+// Replacement algorithm types.
 enum replacement_policy_t
 {
-  REPLACEMENT_LRU,    // Least Recently Used (uses a doubly-linked list)
-  REPLACEMENT_FIFO,   // First In, First Out (uses a queue-like structure)
-  REPLACEMENT_MRU,    // Most Recently Used
-  REPLACEMENT_RANDOM, // Random replacement
-  REPLACEMENT_LFU     // Least Frequently Used
+  REPLACEMENT_LRU,
+  REPLACEMENT_MRU,
+  REPLACEMENT_CLOCK
 };
 static enum replacement_policy_t replacement_policy = REPLACEMENT_LRU;
 
-// ---------------------------------------------------------------------
-// Linked-list node structure for LRU and FIFO policies
-// ---------------------------------------------------------------------
-typedef struct cache_node
-{
-  uintptr_t base;          // Base address of the mapped page
-  struct cache_node *prev; // Pointer to the previous node
-  struct cache_node *next; // Pointer to the next node
-} cache_node;
-
-static cache_node *list_head = NULL; // Head of the linked list
-static cache_node *list_tail = NULL; // Tail of the linked list
-static int list_size = 0;            // Current number of pages in the list
-static int cache_slots = 0;          // Maximum number of pages allowed in the cache
-
-// ---------------------------------------------------------------------
-// Helper function to calculate square roots for a range of numbers
-// Fills 'nr' entries starting at 'sqrt_pos' with sqrt(start + i)
-// ---------------------------------------------------------------------
-static void calculate_sqrts(double *sqrt_pos, int start, int nr)
+// Use this helper function as an oracle for square root values.
+static void
+calculate_sqrts(double *sqrt_pos, int start, int nr)
 {
   for (int i = 0; i < nr; i++)
     sqrt_pos[i] = sqrt((double)(start + i));
 }
 
-// ---------------------------------------------------------------------
-// Linked-list helper functions for LRU and FIFO policies
-// ---------------------------------------------------------------------
-
-// Move a node to the front of the list (used in LRU policy)
-static void lru_move_to_front(cache_node *node)
+// Print current cache mapping.
+static void print_cache()
 {
-  if (node == list_head)
-    return; // Node is already at the front
-
-  // Detach the node from its current position
-  if (node->prev)
-    node->prev->next = node->next;
-  if (node->next)
-    node->next->prev = node->prev;
-  if (node == list_tail)
-    list_tail = node->prev;
-
-  // Insert the node at the front of the list
-  node->prev = NULL;
-  node->next = list_head;
-  if (list_head)
-    list_head->prev = node;
-  list_head = node;
-  if (list_tail == NULL)
-    list_tail = node;
-}
-
-// Insert a new page at the front of the list (used in LRU policy)
-// If the cache is full, evict the least recently used page
-static void lru_insert(uintptr_t page_start)
-{
-  if (list_size >= cache_slots)
+  printf("Current cache mapping (%d/%d pages):\n", cache_count, cache_slots);
+  for (int i = 0; i < cache_count; i++)
   {
-    // Evict the least recently used page (tail of the list)
-    cache_node *victim = list_tail;
-    if (munmap((void *)victim->base, page_size) == -1)
-    {
-      fprintf(stderr, "Error unmapping page at 0x%lx: %s\n",
-              victim->base, strerror(errno));
-      exit(EXIT_FAILURE);
-    }
-    evictions++;
-    // Remove the victim node from the list
-    if (victim->prev)
-    {
-      victim->prev->next = NULL;
-      list_tail = victim->prev;
-    }
-    else
-    {
-      // Only one element in the list
-      list_head = list_tail = NULL;
-    }
-    free(victim);
-    list_size--;
-  }
-
-  // Map the new page at the specified address
-  if (mmap((void *)page_start, page_size, PROT_READ | PROT_WRITE,
-           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED)
-  {
-    fprintf(stderr, "Error mapping page at 0x%lx: %s\n",
-            page_start, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  // Initialize the new page with square root values
-  int start_index = (page_start - (uintptr_t)sqrts) / sizeof(double);
-  calculate_sqrts((double *)page_start, start_index, page_size / sizeof(double));
-
-  // Create a new node and add it to the front of the list
-  cache_node *node = malloc(sizeof(cache_node));
-  if (!node)
-  {
-    fprintf(stderr, "Memory allocation failed for cache node\n");
-    exit(EXIT_FAILURE);
-  }
-  node->base = page_start;
-  node->prev = NULL;
-  node->next = list_head;
-  if (list_head)
-    list_head->prev = node;
-  list_head = node;
-  if (list_tail == NULL)
-    list_tail = node;
-  list_size++;
-}
-
-// Insert a new page at the end of the list (used in FIFO policy)
-// If the cache is full, evict the oldest page
-static void fifo_insert(uintptr_t page_start)
-{
-  if (list_size >= cache_slots)
-  {
-    // Evict the oldest page (head of the list)
-    cache_node *victim = list_head;
-    if (munmap((void *)victim->base, page_size) == -1)
-    {
-      fprintf(stderr, "Error unmapping page at 0x%lx: %s\n",
-              victim->base, strerror(errno));
-      exit(EXIT_FAILURE);
-    }
-    evictions++;
-    // Remove the head node from the list
-    list_head = victim->next;
-    if (list_head)
-      list_head->prev = NULL;
-    else
-      list_tail = NULL;
-    free(victim);
-    list_size--;
-  }
-
-  // Map the new page at the specified address
-  if (mmap((void *)page_start, page_size, PROT_READ | PROT_WRITE,
-           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED)
-  {
-    fprintf(stderr, "Error mapping page at 0x%lx: %s\n",
-            page_start, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  // Initialize the new page with square root values
-  int start_index = (page_start - (uintptr_t)sqrts) / sizeof(double);
-  calculate_sqrts((double *)page_start, start_index, page_size / sizeof(double));
-
-  // Create a new node and add it to the end of the list
-  cache_node *node = malloc(sizeof(cache_node));
-  if (!node)
-  {
-    fprintf(stderr, "Memory allocation failed for cache node\n");
-    exit(EXIT_FAILURE);
-  }
-  node->base = page_start;
-  node->next = NULL;
-  node->prev = list_tail;
-  if (list_tail)
-    list_tail->next = node;
-  list_tail = node;
-  if (!list_head)
-    list_head = node;
-  list_size++;
-}
-
-// Helper function to print the current state of the cache
-static void print_list_cache()
-{
-  printf("Cache state (linked list: %d/%d):\n", list_size, cache_slots);
-  cache_node *curr = list_head;
-  int idx = 0;
-  while (curr)
-  {
-    int start_index = (curr->base - (uintptr_t)sqrts) / sizeof(double);
+    int start_index = (cache[i].base - (uintptr_t)sqrts) / sizeof(double);
     int num_entries = page_size / sizeof(double);
-    printf("  Node %d: indices [%d - %d]\n", idx, start_index, start_index + num_entries - 1);
-    curr = curr->next;
-    idx++;
+    printf("  Page %d: indices [%d - %d]", i, start_index, start_index + num_entries - 1);
+
+    switch (replacement_policy)
+    {
+    case REPLACEMENT_LRU:
+      printf(", last_acc = %lu", cache[i].last_acc);
+      break;
+
+    case REPLACEMENT_MRU:
+      printf(", insert_num = %lu", cache[i].insert_num);
+      break;
+
+    case REPLACEMENT_CLOCK:
+      printf(", ref_bit = %d", cache[i].ref_bit);
+      break;
+
+    default:
+      // In case of an unknown policy, print all stats for debugging
+      printf(", last_acc = %lu, insert_num = %lu, freq. = %lu", cache[i].last_acc, cache[i].insert_num, cache[i].freq);
+      break;
+    }
+
+    printf("\n");
   }
   printf("\n");
 }
 
-// ---------------------------------------------------------------------
-// SIGSEGV signal handler: Handles page faults and invokes the replacement
-// policy to map or remap the faulting page
-// ---------------------------------------------------------------------
-static void handle_sigsegv(int sig, siginfo_t *si, void *ctx)
+static void
+handle_sigsegv(int sig, siginfo_t *si, void *ctx)
 {
   uintptr_t fault_addr = (uintptr_t)si->si_addr;
   uintptr_t page_start = align_down(fault_addr, page_size);
 
-  // Check if the fault address is within the valid sqrt region
+  // Check if the faulting address is within the valid region.
   if (fault_addr < (uintptr_t)sqrts ||
       fault_addr >= (uintptr_t)sqrts + MAX_SQRTS * sizeof(double))
   {
-    fprintf(stderr, "Unexpected SIGSEGV at 0x%lx\n", fault_addr);
+    fprintf(stderr, "oops got SIGSEGV at 0x%lx\n", fault_addr);
     exit(EXIT_FAILURE);
   }
 
-  num_faults++; // Increment the fault counter
+  page_faults++; // Count each SIGSEGV as a page fault.
 
-  // Handle the fault based on the replacement policy
-  if (replacement_policy == REPLACEMENT_LRU)
+  int victim_idx = -1;
+  if (cache_count >= cache_slots)
   {
-    // Check if the page is already in the cache
-    cache_node *curr = list_head;
-    while (curr)
+    // Choose victim based on the replacement policy.
+    switch (replacement_policy)
     {
-      if (curr->base == page_start)
+    case REPLACEMENT_LRU:
+    {
+      unsigned long min = cache[0].last_acc;
+      victim_idx = 0;
+      for (int i = 1; i < cache_slots; i++)
       {
-        lru_move_to_front(curr);
-        return;
+        if (cache[i].last_acc < min)
+        {
+          min = cache[i].last_acc;
+          victim_idx = i;
+        }
       }
-      curr = curr->next;
+      break;
     }
-    // Page not found, insert it using LRU policy
-    lru_insert(page_start);
-    print_list_cache();
-  }
-  else if (replacement_policy == REPLACEMENT_FIFO)
-  {
-    // Check if the page is already in the cache
-    cache_node *curr = list_head;
-    while (curr)
+    case REPLACEMENT_MRU:
     {
-      if (curr->base == page_start)
-        return; // No need to update order for FIFO
-      curr = curr->next;
+      unsigned long max = cache[0].last_acc;
+      victim_idx = 0;
+      for (int i = 1; i < cache_slots; i++)
+      {
+        if (cache[i].last_acc > max)
+        {
+          max = cache[i].last_acc;
+          victim_idx = i;
+        }
+      }
+      break;
     }
-    // Page not found, insert it using FIFO policy
-    fifo_insert(page_start);
-    print_list_cache();
+    case REPLACEMENT_CLOCK:
+    {
+      // Use Clock algorithm: search circularly for a page with ref_bit == 0.
+      while (1)
+      {
+        if (cache[clock_hand].ref_bit == 0)
+        {
+          victim_idx = clock_hand;
+          clock_hand = (clock_hand + 1) % cache_slots;
+          break;
+        }
+        else
+        {
+          // Give a second chance: reset the ref_bit and move on.
+          cache[clock_hand].ref_bit = 0;
+          clock_hand = (clock_hand + 1) % cache_slots;
+        }
+      }
+      break;
+    }
+    default:
+      fprintf(stderr, "Unknown replacement policy.\n");
+      exit(EXIT_FAILURE);
+    }
+    // Unmap the victim page.
+    if (munmap((void *)cache[victim_idx].base, page_size) == -1)
+    {
+      fprintf(stderr, "Couldn't munmap() page at 0x%lx; %s\n",
+              cache[victim_idx].base, strerror(errno));
+      exit(EXIT_FAILURE);
+    }
+    evictions++; // Count an eviction.
+    // Replace victim's record with new page mapping.
+    cache[victim_idx].base = page_start;
+    cache[victim_idx].last_acc = ++access_counter;
+    cache[victim_idx].insert_num = access_counter; // Not used now.
+    cache[victim_idx].freq = 1;                    // Not used now.
+    if (replacement_policy == REPLACEMENT_CLOCK)
+      cache[victim_idx].ref_bit = 1;
   }
   else
   {
-    // For unsupported policies, print an error and exit
-    fprintf(stderr, "Unsupported replacement policy.\n");
+    // Cache not full: add new page record.
+    cache[cache_count].base = page_start;
+    cache[cache_count].last_acc = ++access_counter;
+    cache[cache_count].insert_num = access_counter; // Not used now.
+    cache[cache_count].freq = 1;                    // Not used now.
+    if (replacement_policy == REPLACEMENT_CLOCK)
+      cache[cache_count].ref_bit = 1;
+    cache_count++;
+  }
+
+  // Map the new page at page_start.
+  if (mmap((void *)page_start, page_size, PROT_READ | PROT_WRITE,
+           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED)
+  {
+    fprintf(stderr, "Couldn't mmap() page at 0x%lx; %s\n",
+            page_start, strerror(errno));
     exit(EXIT_FAILURE);
   }
+
+  // Initialize the page with square root values.
+  int start_index = (page_start - (uintptr_t)sqrts) / sizeof(double);
+  calculate_sqrts((double *)page_start, start_index, page_size / sizeof(double));
+
+  // Print current cache info.
+  // print_cache();
 }
 
-// ---------------------------------------------------------------------
-// Set up the sqrt region and install the SIGSEGV handler
-// ---------------------------------------------------------------------
-static void setup_sqrt_region(void)
+// Set up the sqrt region and install SIGSEGV handler.
+static void
+setup_sqrt_region(void)
 {
   struct rlimit lim = {AS_LIMIT, AS_LIMIT};
   struct sigaction act;
 
-  // Reserve the memory region for the sqrt table
   sqrts = mmap(NULL, MAX_SQRTS * sizeof(double) + AS_LIMIT, PROT_NONE,
                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (sqrts == MAP_FAILED)
   {
-    fprintf(stderr, "Error reserving memory for sqrt table: %s\n", strerror(errno));
+    fprintf(stderr, "Couldn't mmap() region for sqrt table; %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
-
   if (munmap(sqrts, MAX_SQRTS * sizeof(double) + AS_LIMIT) == -1)
   {
-    fprintf(stderr, "Error unmapping memory for sqrt table: %s\n", strerror(errno));
+    fprintf(stderr, "Couldn't munmap() region for sqrt table; %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
-
-  // Set the soft limit on virtual memory usage
   if (setrlimit(RLIMIT_AS, &lim) == -1)
   {
-    fprintf(stderr, "Error setting memory limit: %s\n", strerror(errno));
+    fprintf(stderr, "Couldn't set rlimit on RLIMIT_AS; %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
-
-  // Install the SIGSEGV handler
   act.sa_sigaction = handle_sigsegv;
   act.sa_flags = SA_SIGINFO;
   sigemptyset(&act.sa_mask);
   if (sigaction(SIGSEGV, &act, NULL) == -1)
   {
-    fprintf(stderr, "Error setting up SIGSEGV handler: %s\n", strerror(errno));
+    fprintf(stderr, "Couldn't set up SIGSEGV handler; %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
 }
 
-// ---------------------------------------------------------------------
-// Statistics printer
-// ---------------------------------------------------------------------
+// Helper to print statistics.
 static void print_stats(double elapsed_seconds)
 {
   printf("===== Statistics =====\n");
   printf("Total accesses: %lu\n", total_accesses);
-  printf("Page faults: %lu\n", num_faults);
+  printf("Page faults: %lu\n", page_faults);
+  if (total_accesses > 0)
+    printf("Page fault rate: %.2f%%\n", (double)page_faults * 100.0 / total_accesses);
   printf("Evictions: %lu\n", evictions);
   if (total_accesses > 0)
-    printf("Fault rate: %.2f%%\n", (double)num_faults * 100.0 / total_accesses);
+    printf("Eviction Rate: %.2f%%\n", (double)evictions * 100.0 / total_accesses);
   printf("Elapsed time: %.3f seconds\n", elapsed_seconds);
   if (total_accesses > 0)
-    printf("Avg time per access: %.6f microseconds\n",
+    printf("Average time per access: %.6f microseconds\n",
            elapsed_seconds * 1e6 / total_accesses);
   printf("======================\n\n");
 }
 
-// ---------------------------------------------------------------------
-// Test routines
-// ---------------------------------------------------------------------
-
+// Test routines.
 static void
 test_sqrt_region(void)
 {
@@ -365,8 +286,9 @@ test_sqrt_region(void)
       pos = rand() % (MAX_SQRTS - 1);
     else
       pos += 1;
-    printf("The number is %d\n", pos);
+    // printf("pos = %d\n", pos);
     calculate_sqrts(&correct_sqrt, pos, 1);
+    // print_cache();
     if (sqrts[pos] != correct_sqrt)
     {
       fprintf(stderr, "Square root is incorrect. Expected %f, got %f.\n",
@@ -395,7 +317,9 @@ test_sqrt_region_1(void)
   {
     total_accesses++;
     pos = i % (MAX_SQRTS - 1);
+    // printf("pos = %d\n", pos);
     calculate_sqrts(&correct_sqrt, pos, 1);
+    // print_cache();
     if (sqrts[pos] != correct_sqrt)
     {
       fprintf(stderr, "Square root is incorrect. Expected %f, got %f.\n",
@@ -424,7 +348,9 @@ test_sqrt_region_1000(void)
   {
     total_accesses++;
     pos = i % (MAX_SQRTS - 1);
+    // printf("pos = %d\n", pos);
     calculate_sqrts(&correct_sqrt, pos, 1);
+    // print_cache();
     if (sqrts[pos] != correct_sqrt)
     {
       fprintf(stderr, "Square root is incorrect. Expected %f, got %f.\n",
@@ -439,20 +365,16 @@ test_sqrt_region_1000(void)
   print_stats(elapsed);
 }
 
-// ---------------------------------------------------------------------
-// Entry Point
-// ---------------------------------------------------------------------
-
 int main(int argc, char *argv[])
 {
   if (argc < 3)
   {
-    fprintf(stderr, "Usage: %s <workload_type: 0,1,1000> <cache_slots> [lru|fifo|mru|random|lfu]\n", argv[0]);
+    fprintf(stderr, "Usage: %s <workload_type: 'default:0',1,2> <cache_slots> ['default:LRU'|MRU|Clock]\n", argv[0]);
     fprintf(stderr, "  Workload types:\n");
     fprintf(stderr, "    0 - mixed random/sequential\n");
     fprintf(stderr, "    1 - sequential\n");
     fprintf(stderr, "    1000 - sparse access\n");
-    fprintf(stderr, "Example: %s 0 16 lru\n", argv[0]);
+    fprintf(stderr, "  Example: %s 0 16 MRU\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
@@ -464,45 +386,58 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
 
-  // Choose replacement policy.
+  // Choose policy based on command-line argument if provided.
   if (argc >= 4)
   {
-    if (strcmp(argv[3], "fifo") == 0)
-      replacement_policy = REPLACEMENT_FIFO;
-    else if (strcmp(argv[3], "lru") == 0)
-      replacement_policy = REPLACEMENT_LRU;
-    else if (strcmp(argv[3], "mru") == 0)
+    if (strcmp(argv[3], "MRU") == 0)
       replacement_policy = REPLACEMENT_MRU;
-    else if (strcmp(argv[3], "random") == 0)
-      replacement_policy = REPLACEMENT_RANDOM;
-    else if (strcmp(argv[3], "lfu") == 0)
-      replacement_policy = REPLACEMENT_LFU;
+    else if (strcmp(argv[3], "Clock") == 0)
+      replacement_policy = REPLACEMENT_CLOCK;
     else
       replacement_policy = REPLACEMENT_LRU;
   }
   else
   {
-    // Default policy for this implementation: use LRU.
     replacement_policy = REPLACEMENT_LRU;
   }
 
-  printf("page_size is %ld\n", page_size = sysconf(_SC_PAGESIZE));
-  printf("Cache slots: %d, Replacement policy: %s\n\n", cache_slots,
-         (replacement_policy == REPLACEMENT_LRU ? "LRU (stack)" : (replacement_policy == REPLACEMENT_FIFO ? "FIFO (queue)" : "Other")));
+  // Allocate memory for the cache.
+  cache = malloc(sizeof(page_info) * cache_slots);
+  if (!cache)
+  {
+    fprintf(stderr, "Failed to allocate memory for cache.\n");
+    exit(EXIT_FAILURE);
+  }
 
-  // Allocate the sqrt region.
+  page_size = sysconf(_SC_PAGESIZE);
+  printf("page_size is %ld\n", page_size);
+  printf("Cache slots: %d, Replacement policy: ", cache_slots);
+  switch (replacement_policy)
+  {
+  case REPLACEMENT_LRU:
+    printf("LRU\n\n");
+    break;
+  case REPLACEMENT_MRU:
+    printf("MRU\n\n");
+    break;
+  case REPLACEMENT_CLOCK:
+    printf("Clock\n\n");
+    break;
+  default:
+    printf("Unknown\n\n");
+    break;
+  }
   setup_sqrt_region();
 
-  // Reset counters.
-  total_accesses = num_faults = evictions = 0;
+  total_accesses = page_faults = evictions = access_counter = 0;
+  cache_count = 0;
 
-  // Run selected workload.
   switch (workload)
   {
   case 1:
     test_sqrt_region_1();
     break;
-  case 1000:
+  case 2:
     test_sqrt_region_1000();
     break;
   default:
@@ -510,14 +445,6 @@ int main(int argc, char *argv[])
     break;
   }
 
-  // Clean up linked list if using LRU/FIFO.
-  cache_node *curr = list_head;
-  while (curr)
-  {
-    cache_node *next = curr->next;
-    free(curr);
-    curr = next;
-  }
-
+  free(cache);
   return 0;
 }
