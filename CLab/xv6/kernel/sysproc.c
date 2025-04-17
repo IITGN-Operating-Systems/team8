@@ -12,7 +12,7 @@ sys_exit(void)
   int n;
   argint(0, &n);
   exit(n);
-  return 0;  // not reached
+  return 0; // not reached
 }
 
 uint64
@@ -43,7 +43,7 @@ sys_sbrk(void)
 
   argint(0, &n);
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  if (growproc(n) < 0)
     return -1;
   return addr;
 }
@@ -55,12 +55,14 @@ sys_sleep(void)
   uint ticks0;
 
   argint(0, &n);
-  if(n < 0)
+  if (n < 0)
     n = 0;
   acquire(&tickslock);
   ticks0 = ticks;
-  while(ticks - ticks0 < n){
-    if(killed(myproc())){
+  while (ticks - ticks0 < n)
+  {
+    if (killed(myproc()))
+    {
       release(&tickslock);
       return -1;
     }
@@ -90,4 +92,52 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_getPriority(void)
+{
+  return myproc()->priority;
+}
+
+uint64
+sys_setPriority(void)
+{
+  int pid, priority;
+  argint(0, &pid);
+  argint(1, &priority);
+
+  if (priority < 0 || priority > 20)
+    return -1;
+
+  struct proc *current = myproc();
+
+  if (pid == current->pid)
+    return -1;
+
+  struct proc *target = 0;
+
+  extern struct proc proc[];
+  for (struct proc *p = proc; p < &proc[NPROC]; p++)
+  {
+    acquire(&p->lock);
+    if (p->pid == pid)
+    {
+      if (p->parent != current)
+      {
+        release(&p->lock);
+        return -1;
+      }
+      p->priority = priority;
+      target = p;
+      release(&p->lock);
+      break;
+    }
+    release(&p->lock);
+  }
+
+  if (target == 0) // Process not found
+    return -1;
+
+  return 0;
 }
