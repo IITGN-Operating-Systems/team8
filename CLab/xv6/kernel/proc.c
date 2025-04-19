@@ -26,6 +26,19 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+/* OUR IMPLEMENTATION STARTS */
+// define the rand and srand functions
+static unsigned int seed = 1;
+
+void srand(unsigned int s) { seed = s; }
+
+int rand(void)
+{
+  seed = seed * 1664525 + 1013904223;
+  return (seed & 0x7FFFFFFF);
+}
+/* OUR IMPLEMENTATION ENDS */
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -104,6 +117,9 @@ int allocpid()
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
+
+/* OUR IMPLEMENTATION */
+/* PRIORITY AND TICKETS INITIALISED HERE */
 static struct proc *
 allocproc(void)
 {
@@ -125,7 +141,12 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+
+  /* OUR IMPLEMENTATION STARTS */
   p->priority = 0;
+  p->tickets = (rand() % 50) + 50; // random number between 50 and 100
+  /* OUR IMPLEMENTATION ENDS */
+
   if (p->pid == 1)
     p->priority = 20;
 
@@ -158,6 +179,9 @@ found:
 // free a proc structure and the data hanging from it,
 // including user pages.
 // p->lock must be held.
+
+/* OUR IMPLEMENTATION */
+/* PRIORITY AND TICKETS SET TO 0 */
 static void
 freeproc(struct proc *p)
 {
@@ -175,6 +199,11 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  /* OUR IMPLEMENTATION STARTS */
+  p->tickets = 0;
+  p->priority = 0;
+  /* OUR IMPLEMENTATION ENDS */
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -457,6 +486,71 @@ int wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+// void scheduler(void)
+// {
+//   struct proc *p;
+//   struct cpu *c = mycpu();
+
+//   c->proc = 0;
+//   c->context_switches = 0;
+//   for (;;)
+//   {
+//     // The most recent process to run may have had interrupts
+//     // turned off; enable them to avoid a deadlock if all
+//     // processes are waiting.
+//     intr_on();
+
+//     int found = 0;
+//     for (p = proc; p < &proc[NPROC]; p++)
+//     {
+//       acquire(&p->lock);
+//       if (p->state == RUNNABLE)
+//       {
+//         // Switch to chosen process.  It is the process's job
+//         // to release its lock and then reacquire it
+//         // before jumping back to us.
+//         p->state = RUNNING;
+//         c->proc = p;
+//         swtch(&c->context, &p->context);
+
+//         c->context_switches++;
+//         // printf("CPU %d: Context Switches = %d\n", cpuid(), c->context_switches);
+//         if (c->context_switches >= 3)
+//         {
+//           char *proc_type = "Unknown";
+//           if (p->parent == 0)
+//             proc_type = "Kernel";
+//           else
+//             proc_type = "User";
+
+//           printf("\t\t\t\t\t330\t=== Third Context Switch on CPU %d | %s Process: %s (PID: %d, Parent PID: %d, Priority: %d) ===\n",
+//                  cpuid(),
+//                  proc_type,
+//                  p->name,
+//                  p->pid,
+//                  p->parent ? p->parent->pid : 0,
+//                  p->priority);
+//           // printf("330\n");
+//           c->context_switches = 0;
+//           for (int i = 0; i < 1000000000; i++) asm volatile("nop");
+//         }
+//         // Process is done running for now.
+//         // It should have changed its p->state before coming back.
+//         c->proc = 0;
+//         found = 1;
+//       }
+//       release(&p->lock);
+//     }
+//     if (found == 0)
+//     {
+//       // nothing to run; stop running on this core until an interrupt.
+//       intr_on();
+//       asm volatile("wfi");
+//     }
+//   }
+// }
+
+/* OUR IMPLEMENTATION STARTS */
 void scheduler(void)
 {
   struct proc *p;
@@ -472,46 +566,82 @@ void scheduler(void)
     intr_on();
 
     int found = 0;
+
+    int total_tickets = 0;
+    int winning_ticket = 0;
+    int current_ticket = 0;
+
+    /* FIRST COUNT THE TOTAL NUMBER OF TICKETS BY TRAVERSING THE PROCESS LIST */
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE)
+        total_tickets += p->tickets;
+      release(&p->lock);
+    }
+    
+    /* IF THERE ARE NO TICKETS, THEN WE CAN'T RUN ANY PROCESS */
+    if (total_tickets == 0)
+    {
+      // nothing to run; stop running on this core until an interrupt.
+      intr_on();
+      asm volatile("wfi");
+      continue;
+    }
+
+    /* GENERATE A RANDOM NUMBER BETWEEN 0 AND TOTAL_TICKETS */
+    winning_ticket = rand() % total_tickets;
+
     for (p = proc; p < &proc[NPROC]; p++)
     {
       acquire(&p->lock);
       if (p->state == RUNNABLE)
       {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+        
+        /* Check if the current process's tickets exceed the winning ticket */
+        current_ticket += p->tickets;
 
-        c->context_switches++;
-        // printf("CPU %d: Context Switches = %d\n", cpuid(), c->context_switches);
-        if (c->context_switches >= 3)
-        {
-          char *proc_type = "Unknown";
-          if (p->parent == 0)
-            proc_type = "Kernel";
-          else
-            proc_type = "User";
+        printf("CPU %d: Process %s (PID: %d, Priority: %d, Tickets: %d)\n", cpuid(), p->name, p->pid, p->priority, p->tickets);
+        printf("CPU %d: Winning Ticket: %d, Current Ticket: %d\n", cpuid(), winning_ticket, current_ticket);
+        printf("CPU %d: Total Tickets: %d\n", cpuid(), total_tickets);
+        printf("CPU %d: Current Ticket: %d\n", cpuid(), current_ticket);
+        
+        if (current_ticket > winning_ticket)
+        {  
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          c->proc = p;
+          swtch(&c->context, &p->context);
 
-          printf("\t\t\t\t\t330\t=== Third Context Switch on CPU %d | %s Process: %s (PID: %d, Parent PID: %d, Priority: %d) ===\n",
-                 cpuid(),
-                 proc_type,
-                 p->name,
-                 p->pid,
-                 p->parent ? p->parent->pid : 0,
-                 p->priority);
-          // printf("330\n");
-          c->context_switches = 0;
-          for (int i = 0; i < 1000000000; i++)
+          c->context_switches++;
+          // printf("CPU %d: Context Switches = %d\n", cpuid(), c->context_switches);
+          if (c->context_switches >= 3)
           {
-            asm volatile("nop");
+            char *proc_type = "Unknown";
+            if (p->parent == 0)
+              proc_type = "Kernel";
+            else
+              proc_type = "User";
+
+            printf("\t\t\t\t\t330\t=== Third Context Switch on CPU %d | %s Process: %s (PID: %d, Parent PID: %d, Priority: %d) ===\n",
+                  cpuid(),
+                  proc_type,
+                  p->name,
+                  p->pid,
+                  p->parent ? p->parent->pid : 0,
+                  p->priority);
+            // printf("330\n");
+            c->context_switches = 0;
+            for (int i = 0; i < 1000000000; i++) asm volatile("nop");
           }
+          
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+          found = 1;
         }
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
       }
       release(&p->lock);
     }
@@ -523,6 +653,7 @@ void scheduler(void)
     }
   }
 }
+/* OUR IMPLEMENTATION ENDS */
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores

@@ -120,4 +120,5 @@ struct proc
   char name[16];               // Process name (debugging)
 
   int priority;
+  int tickets;
 };
