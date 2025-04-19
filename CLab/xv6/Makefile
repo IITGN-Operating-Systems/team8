@@ -49,7 +49,7 @@ endif
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
-TOOLPREFIX = riscv64-linux-gnu-
+# TOOLPREFIX = riscv64-linux-gnu-
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
