@@ -49,7 +49,7 @@ endif
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
-# TOOLPREFIX = riscv64-linux-gnu-
+TOOLPREFIX = riscv64-linux-gnu-
 
 # Try to infer the correct TOOLPREFIX if not set
 ifndef TOOLPREFIX
@@ -175,6 +175,7 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_priotest\
+	$U/_cstest\
 
 
 $U/uthread_switch.o : $U/uthread_switch.S
@@ -217,7 +218,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 3
+CPUS := 1
 endif
 
 FWDPORT1 = $(shell expr `id -u` % 5000 + 25999)
