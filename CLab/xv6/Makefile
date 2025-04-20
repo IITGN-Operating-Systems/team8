@@ -4,13 +4,19 @@
 K=kernel
 U=user
 
+ifdef USE_OUR_PROC
+PROC_SOURCE = $K/proc_our.c
+else
+PROC_SOURCE = $K/proc.c
+endif
+
 OBJS = \
   $K/entry.o \
   $K/kalloc.o \
   $K/string.o \
   $K/main.o \
   $K/vm.o \
-  $K/proc.o \
+  $(PROC_SOURCE:.c=.o) \
   $K/swtch.o \
   $K/trampoline.o \
   $K/trap.o \
@@ -231,6 +237,9 @@ QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 qemu: $K/kernel fs.img
 	$(QEMU) $(QEMUOPTS)
+
+qemu-our: clean
+	make qemu USE_OUR_PROC=1
 
 .gdbinit: .gdbinit.tmpl-riscv
 	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
