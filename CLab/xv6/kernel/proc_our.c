@@ -601,10 +601,10 @@ void scheduler(void)
         /* Check if the current process's tickets exceed the winning ticket */
         current_ticket += p->tickets;
 
-        printf("CPU %d: Process %s (PID: %d, Priority: %d, Tickets: %d)\n", cpuid(), p->name, p->pid, p->priority, p->tickets);
-        printf("CPU %d: Winning Ticket: %d, Current Ticket: %d\n", cpuid(), winning_ticket, current_ticket);
-        printf("CPU %d: Total Tickets: %d\n", cpuid(), total_tickets);
-        printf("CPU %d: Current Ticket: %d\n", cpuid(), current_ticket);
+        // printf("CPU %d: Process %s (PID: %d, Priority: %d, Tickets: %d)\n", cpuid(), p->name, p->pid, p->priority, p->tickets);
+        // printf("CPU %d: Winning Ticket: %d, Current Ticket: %d\n", cpuid(), winning_ticket, current_ticket);
+        // printf("CPU %d: Total Tickets: %d\n", cpuid(), total_tickets);
+        // printf("CPU %d: Current Ticket: %d\n", cpuid(), current_ticket);
         
         if (current_ticket > winning_ticket)
         {  
